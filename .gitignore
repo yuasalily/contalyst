@@ -1,0 +1,13 @@
+# Build output
+/contalyst
+/dist/
+*.exe
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Editor / OS
+.DS_Store
+*.swp

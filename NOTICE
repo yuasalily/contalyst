@@ -1,0 +1,36 @@
+Contalyst
+Copyright 2026 The Contalyst Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles the following third-party Go modules. All are permissive
+licenses compatible with redistribution in a single binary; none are copyleft
+(see aidlc-docs/inception decision DR-1):
+
+  Apache License 2.0
+    github.com/docker/docker            (Docker Engine SDK)
+    github.com/docker/go-connections
+    github.com/docker/go-units
+    github.com/moby/*                   (transitive)
+    github.com/containerd/errdefs       (transitive)
+    go.opentelemetry.io/*               (transitive)
+    google.golang.org/grpc, protobuf    (transitive)
+
+  MIT License
+    github.com/charmbracelet/bubbletea  (TUI framework)
+    github.com/charmbracelet/bubbles    (TUI components)
+    github.com/charmbracelet/lipgloss   (styling)
+    github.com/charmbracelet/x/*        (transitive)
+    github.com/muesli/*                 (transitive)
+    github.com/mattn/go-runewidth, go-isatty
+    github.com/lucasb-eyer/go-colorful
+
+  BSD-3-Clause
+    github.com/distribution/reference
+    golang.org/x/* (sys, text, net, exp)
+
+  BSD-2-Clause
+    github.com/pkg/errors
+
+For the complete, authoritative license text of each module, see its source
+repository or your local Go module cache.
