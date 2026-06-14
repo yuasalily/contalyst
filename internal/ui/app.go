@@ -30,6 +30,7 @@ const (
 	ovCommand
 	ovConfirm
 	ovHelp
+	ovLogSearch
 )
 
 type connectedMsg struct{ ver string }
@@ -59,6 +60,7 @@ type model struct {
 	filter      string
 	filterInput textinput.Model
 	cmdInput    textinput.Model
+	searchInput textinput.Model
 	confirm     confirmState
 
 	detail  detailState
@@ -67,6 +69,7 @@ type model struct {
 	toast        string
 	toastErr     bool
 	compactHints bool
+	rounded      bool
 }
 
 type inspectState struct {
@@ -86,14 +89,20 @@ func New(client *dockerx.Client) model {
 	ci.Prompt = ""
 	ci.Placeholder = "command (try: images, volumes, networks, theme, quit)"
 
+	si := textinput.New()
+	si.Prompt = ""
+	si.Placeholder = "search logs…"
+
 	return model{
 		client:      client,
 		keys:        defaultKeys(),
 		th:          th,
-		s:           newStyles(th),
+		s:           newStyles(th, true),
 		kind:        kindContainers,
 		filterInput: fi,
 		cmdInput:    ci,
+		searchInput: si,
+		rounded:     true,
 	}
 }
 
@@ -272,6 +281,8 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.overlay = ovNone
 		}
 		return m, nil
+	case ovLogSearch:
+		return m.updateLogSearch(msg)
 	}
 
 	switch m.state {
@@ -294,7 +305,7 @@ func (m *model) setToast(text string, isErr bool) tea.Cmd {
 // applyTheme rebuilds styles after a theme change.
 func (m *model) applyTheme(t theme.Theme) {
 	m.th = t
-	m.s = newStyles(t)
+	m.s = newStyles(t, m.rounded)
 	m.rebuildList()
 }
 

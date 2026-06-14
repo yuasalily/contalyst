@@ -25,6 +25,11 @@ type detailState struct {
 	logCancel  context.CancelFunc
 	logCh      <-chan dockerx.LogLine
 
+	// In-log search (inception FR-C5): highlight matches and jump between them.
+	search   string
+	matches  []int // indices into lines that contain the query
+	matchIdx int
+
 	stats       dockerx.Stats
 	haveStats   bool
 	statsCancel context.CancelFunc
@@ -40,6 +45,9 @@ func (m model) enterDetail(id, name string) (tea.Model, tea.Cmd) {
 	m.detail.lines = nil
 	m.detail.follow = true
 	m.detail.haveStats = false
+	m.detail.search = ""
+	m.detail.matches = nil
+	m.detail.matchIdx = 0
 	m.detail.logs.SetContent("")
 	m.detail.logs.GotoTop()
 	m.recomputeLayout()
@@ -84,6 +92,22 @@ func (m model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, k.Help):
 		m.overlay = ovHelp
 		return m, nil
+	case key.Matches(msg, k.Search):
+		m.overlay = ovLogSearch
+		m.searchInput.SetValue(m.detail.search)
+		m.searchInput.CursorEnd()
+		m.searchInput.Focus()
+		return m, nil
+	case key.Matches(msg, k.SearchNext):
+		if m.detail.search != "" {
+			m.stepMatch(1)
+		}
+		return m, nil
+	case key.Matches(msg, k.SearchPrev):
+		if m.detail.search != "" {
+			m.stepMatch(-1)
+		}
+		return m, nil
 	case key.Matches(msg, k.Follow):
 		m.detail.follow = !m.detail.follow
 		if m.detail.follow {
@@ -118,7 +142,10 @@ func (m model) handleLogLine(line dockerx.LogLine) (tea.Model, tea.Cmd) {
 		if len(m.detail.lines) > maxLogLines {
 			m.detail.lines = m.detail.lines[len(m.detail.lines)-maxLogLines:]
 		}
-		m.detail.logs.SetContent(strings.Join(m.detail.lines, "\n"))
+		m.detail.logs.SetContent(m.renderLogContent())
+		if m.detail.search != "" {
+			m.computeMatches()
+		}
 		if m.detail.follow {
 			m.detail.logs.GotoBottom()
 		}
@@ -127,6 +154,83 @@ func (m model) handleLogLine(line dockerx.LogLine) (tea.Model, tea.Cmd) {
 		return m, waitLogCmd(m.detail.logCh)
 	}
 	return m, nil
+}
+
+// renderLogContent joins the buffered log lines, highlighting the active search
+// query (inception FR-C5). With no query it returns the lines verbatim.
+func (m model) renderLogContent() string {
+	if m.detail.search == "" {
+		return strings.Join(m.detail.lines, "\n")
+	}
+	out := make([]string, len(m.detail.lines))
+	for i, ln := range m.detail.lines {
+		out[i] = highlightMatches(ln, m.detail.search, m.s.searchHit)
+	}
+	return strings.Join(out, "\n")
+}
+
+// computeMatches records the line indices that contain the search query
+// (case-insensitive) so the user can jump between them.
+func (m *model) computeMatches() {
+	m.detail.matches = m.detail.matches[:0]
+	q := strings.ToLower(m.detail.search)
+	if q == "" {
+		return
+	}
+	for i, ln := range m.detail.lines {
+		if strings.Contains(strings.ToLower(ln), q) {
+			m.detail.matches = append(m.detail.matches, i)
+		}
+	}
+	if m.detail.matchIdx >= len(m.detail.matches) {
+		m.detail.matchIdx = 0
+	}
+}
+
+// stepMatch advances the current match by delta (wrapping) and scrolls to it.
+func (m *model) stepMatch(delta int) {
+	n := len(m.detail.matches)
+	if n == 0 {
+		return
+	}
+	m.detail.matchIdx = (m.detail.matchIdx + delta%n + n) % n
+	m.jumpToMatch()
+}
+
+// jumpToMatch scrolls the log viewport so the current match is visible and
+// pauses follow so it stays put.
+func (m *model) jumpToMatch() {
+	if len(m.detail.matches) == 0 {
+		return
+	}
+	if m.detail.matchIdx < 0 || m.detail.matchIdx >= len(m.detail.matches) {
+		m.detail.matchIdx = 0
+	}
+	m.detail.follow = false
+	m.detail.logs.SetYOffset(m.detail.matches[m.detail.matchIdx])
+}
+
+// highlightMatches wraps each case-insensitive occurrence of query in line with
+// the given style. Pure helper so it is unit-testable.
+func highlightMatches(line, query string, style lipgloss.Style) string {
+	if query == "" {
+		return line
+	}
+	lower := strings.ToLower(line)
+	lq := strings.ToLower(query)
+	var b strings.Builder
+	for i := 0; i < len(line); {
+		idx := strings.Index(lower[i:], lq)
+		if idx < 0 {
+			b.WriteString(line[i:])
+			break
+		}
+		start := i + idx
+		b.WriteString(line[i:start])
+		b.WriteString(style.Render(line[start : start+len(query)]))
+		i = start + len(query)
+	}
+	return b.String()
 }
 
 func (m model) detailView() string {

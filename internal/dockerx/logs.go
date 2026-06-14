@@ -54,9 +54,9 @@ func (c *Client) LogStream(ctx context.Context, id string, timestamps bool) (<-c
 
 	go func() {
 		defer close(out)
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		if pw != nil {
-			defer pw.Close()
+			defer func() { _ = pw.Close() }()
 		}
 		scanner := bufio.NewScanner(source)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

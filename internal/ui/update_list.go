@@ -30,6 +30,18 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, k.Theme):
 		return m, m.cycleTheme()
+	case key.Matches(msg, k.CompactHints):
+		m.compactHints = !m.compactHints
+		m.recomputeLayout()
+		return m, nil
+	case key.Matches(msg, k.Frame):
+		m.rounded = !m.rounded
+		m.applyTheme(m.th)
+		mode := "square"
+		if m.rounded {
+			mode = "rounded"
+		}
+		return m, m.setToast("frames: "+mode, false)
 	case key.Matches(msg, k.Refresh):
 		return m, m.loadCmd()
 	case key.Matches(msg, k.Up):

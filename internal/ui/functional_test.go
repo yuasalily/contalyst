@@ -144,6 +144,88 @@ func TestFunctional_SwitchToImages(t *testing.T) {
 	}
 }
 
+func TestFunctional_LogSearch(t *testing.T) {
+	m := ready(t)
+	nm, _ := m.enterDetail("id-web", "ct-web")
+	m = nm.(model)
+	m = feed(t, m,
+		logLineMsg(dockerx.LogLine{Text: "listening on :80"}),
+		logLineMsg(dockerx.LogLine{Text: "ERROR: connection refused"}),
+		logLineMsg(dockerx.LogLine{Text: "retrying error in 1s"}),
+	)
+	// Open search and type a query that matches two lines (case-insensitive).
+	m = feed(t, m, keyRunes("/"))
+	if m.overlay != ovLogSearch {
+		t.Fatalf("expected log-search overlay, got %v", m.overlay)
+	}
+	m = feed(t, m, keyRunes("error"))
+	if m.detail.search != "error" {
+		t.Fatalf("search query not applied: %q", m.detail.search)
+	}
+	if got := len(m.detail.matches); got != 2 {
+		t.Fatalf("expected 2 matches, got %d (%v)", got, m.detail.matches)
+	}
+	// Bottom bar reports the match count while searching.
+	if out := m.bottomView(); !strings.Contains(out, "1/2") {
+		t.Errorf("search bar missing match counter\n---\n%s", out)
+	}
+	// Enter commits the search; n/N cycle through matches.
+	m = feed(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.overlay != ovNone {
+		t.Fatalf("enter should close the search overlay")
+	}
+	m = feed(t, m, keyRunes("n"))
+	if m.detail.matchIdx != 1 {
+		t.Errorf("n should advance to match 1, got %d", m.detail.matchIdx)
+	}
+	m = feed(t, m, keyRunes("n")) // wraps back to first
+	if m.detail.matchIdx != 0 {
+		t.Errorf("n should wrap to match 0, got %d", m.detail.matchIdx)
+	}
+	// Esc clears the search.
+	m = feed(t, m, keyRunes("/"), tea.KeyMsg{Type: tea.KeyEsc})
+	if m.detail.search != "" || len(m.detail.matches) != 0 {
+		t.Errorf("esc should clear the search, got %q / %v", m.detail.search, m.detail.matches)
+	}
+}
+
+func TestFunctional_CompactHintsToggle(t *testing.T) {
+	m := ready(t)
+	if m.compactHints {
+		t.Fatal("compact hints should start disabled")
+	}
+	m = feed(t, m, keyRunes("H"))
+	if !m.compactHints {
+		t.Error("H should enable compact hints")
+	}
+	// In compact mode the hint bar is a single line.
+	if got := strings.Count(m.hintView(), "\n"); got != 0 {
+		t.Errorf("compact hint bar should be one line, got %d newlines", got)
+	}
+	m = feed(t, m, keyRunes("H"))
+	if m.compactHints {
+		t.Error("H should toggle compact hints back off")
+	}
+}
+
+func TestFunctional_FrameToggle(t *testing.T) {
+	m := ready(t)
+	if !m.rounded {
+		t.Fatal("frames should start rounded")
+	}
+	m = feed(t, m, keyRunes("F"))
+	if m.rounded {
+		t.Error("F should switch to square frames")
+	}
+	if m.toast == "" || !strings.Contains(m.toast, "square") {
+		t.Errorf("frame toggle should announce the mode, got %q", m.toast)
+	}
+	m = feed(t, m, keyRunes("F"))
+	if !m.rounded {
+		t.Error("F should switch back to rounded frames")
+	}
+}
+
 func TestFunctional_TinyTerminalNoPanic(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {

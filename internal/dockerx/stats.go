@@ -32,7 +32,7 @@ func (c *Client) StatsStream(ctx context.Context, id string) (<-chan Stats, erro
 	out := make(chan Stats, 8)
 	go func() {
 		defer close(out)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		dec := json.NewDecoder(resp.Body)
 		for {
 			if ctx.Err() != nil {
