@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +19,7 @@ const (
 	kindImages
 	kindVolumes
 	kindNetworks
+	kindCompose
 )
 
 func (k resourceKind) String() string {
@@ -27,6 +30,8 @@ func (k resourceKind) String() string {
 		return "Volumes"
 	case kindNetworks:
 		return "Networks"
+	case kindCompose:
+		return "Compose"
 	default:
 		return "Containers"
 	}
@@ -66,7 +71,52 @@ type statsClosedMsg struct{}
 
 type toastClearMsg struct{}
 
+// composeAvailMsg reports whether `docker compose` is usable (U9 / FR-CMP7).
+type composeAvailMsg struct{ ok bool }
+
+// Multi-host / context switching (U11).
+type contextsMsg []dockerx.DockerContext
+type reconnectedMsg struct {
+	ver string
+	err error
+}
+
 // --- commands ---
+
+// composeAvailCmd probes for the docker compose plugin once at startup.
+func composeAvailCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return composeAvailMsg{ok: dockerx.ComposeAvailable(ctx)}
+	}
+}
+
+// contextsCmd lists the available Docker contexts for the switcher (U11).
+func contextsCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		ctxs, err := dockerx.Contexts(ctx)
+		if err != nil {
+			return errMsg{err}
+		}
+		return contextsMsg(ctxs)
+	}
+}
+
+// reconnectCmd pings a freshly built client after a context switch and fetches
+// its version, without restarting the periodic refresh tick.
+func reconnectCmd(c *dockerx.Client) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := c.Ping(ctx); err != nil {
+			return reconnectedMsg{err: err}
+		}
+		return reconnectedMsg{ver: c.ServerVersion(ctx)}
+	}
+}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
@@ -117,6 +167,41 @@ func action(ok string, fn func(ctx context.Context) error) tea.Cmd {
 			return actionDoneMsg{err: err}
 		}
 		return actionDoneMsg{ok: ok}
+	}
+}
+
+// bulkAction applies fn to every id concurrently and reports an aggregated
+// result (U10 / FR-B5). Partial failure is tolerated: the toast summarises how
+// many succeeded and failed rather than aborting on the first error.
+func bulkAction(verb string, ids []string, fn func(ctx context.Context, id string) error) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		var wg sync.WaitGroup
+		errs := make([]error, len(ids))
+		for i, id := range ids {
+			wg.Add(1)
+			go func(i int, id string) {
+				defer wg.Done()
+				errs[i] = fn(ctx, id)
+			}(i, id)
+		}
+		wg.Wait()
+		failed := 0
+		var firstErr error
+		for _, e := range errs {
+			if e != nil {
+				failed++
+				if firstErr == nil {
+					firstErr = e
+				}
+			}
+		}
+		ok := len(ids) - failed
+		if failed > 0 {
+			return actionDoneMsg{err: fmt.Errorf("%s: %d ok, %d failed — %v", verb, ok, failed, firstErr)}
+		}
+		return actionDoneMsg{ok: fmt.Sprintf("%s: %d ok", verb, ok)}
 	}
 }
 

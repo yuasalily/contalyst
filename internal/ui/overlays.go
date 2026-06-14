@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -96,7 +95,7 @@ func (m model) updateLogSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // --- command palette ---
 
-var commandNames = []string{"containers", "images", "volumes", "networks", "prune", "theme", "help", "quit"}
+var commandNames = []string{"containers", "compose", "images", "volumes", "networks", "context", "prune", "oplog", "theme", "help", "quit"}
 
 func (m model) updateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -126,7 +125,11 @@ func (m model) runCommand(raw string) (tea.Model, tea.Cmd) {
 	case "", "esc":
 		return m, nil
 	case "containers", "container", "ps", "c":
+		m.composeScope = ""
 		return m, m.setKind(kindContainers)
+	case "compose", "comp", "stacks":
+		m.composeScope = ""
+		return m, m.setKind(kindCompose)
 	case "images", "image", "img", "i":
 		return m, m.setKind(kindImages)
 	case "volumes", "volume", "vol", "v":
@@ -140,28 +143,16 @@ func (m model) runCommand(raw string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "quit", "q", "exit":
 		return m, tea.Quit
+	case "context", "contexts", "hosts", "host", "ctx":
+		return m, contextsCmd()
+	case "oplog", "ops", "log", "history":
+		m.overlay = ovOpLog
+		return m, nil
 	case "prune":
-		return m.runPrune()
+		return m, pruneUsageCmd(m.client)
 	default:
 		return m, m.setToast("unknown command: "+cmd, true)
 	}
-}
-
-func (m model) runPrune() (tea.Model, tea.Cmd) {
-	cl := m.client
-	var p tea.Cmd
-	switch m.kind {
-	case kindContainers:
-		p = action("pruned stopped containers", func(ctx context.Context) error { return cl.PruneContainers(ctx) })
-	case kindImages:
-		p = action("pruned dangling images", func(ctx context.Context) error { return cl.PruneImages(ctx) })
-	case kindVolumes:
-		p = action("pruned unused volumes", func(ctx context.Context) error { return cl.PruneVolumes(ctx) })
-	case kindNetworks:
-		p = action("pruned unused networks", func(ctx context.Context) error { return cl.PruneNetworks(ctx) })
-	}
-	m.openConfirm("Prune "+m.kind.String(), "Remove all unused "+strings.ToLower(m.kind.String())+"?", true, p)
-	return m, nil
 }
 
 func commandSuggest(prefix string) string {
@@ -183,6 +174,9 @@ func (m model) headerView() string {
 	left := m.s.appName.Render("Contalyst")
 	sep := m.s.crumbSep.Render(" › ")
 	crumbs := m.s.crumb.Render(m.kind.String())
+	if m.composeScope != "" && m.kind == kindContainers {
+		crumbs = m.s.crumb.Render("Compose") + sep + m.s.crumb.Render(m.composeScope)
+	}
 	switch m.state {
 	case stateDetail:
 		crumbs += sep + m.s.crumb.Render(m.detail.name)
@@ -192,7 +186,11 @@ func (m model) headerView() string {
 	if m.filter != "" {
 		crumbs += "  " + m.s.hintDesc.Render("/"+m.filter)
 	}
-	right := m.s.statusInfo.Render(fmt.Sprintf("docker %s · %s", m.serverVer, m.th.Name))
+	hostInfo := ""
+	if label := m.activeContextLabel(); label != "" {
+		hostInfo = label + " · "
+	}
+	right := m.s.statusInfo.Render(fmt.Sprintf("%sdocker %s · %s", hostInfo, m.serverVer, m.th.Name))
 
 	line := left + sep + crumbs
 	gap := m.width - lipgloss.Width(line) - lipgloss.Width(right)
@@ -243,9 +241,17 @@ func (m model) hintView() string {
 	case stateInspect:
 		tokens = [][2]string{{"↑↓", "scroll"}, {"esc", "back"}, {"?", "help"}, {"q", "quit"}}
 	default:
-		if m.kind == kindContainers {
-			tokens = [][2]string{{"↑↓", "move"}, {"⏎", "logs"}, {"s", "start/stop"}, {"r", "restart"}, {"e", "exec"}, {"i", "inspect"}, {"d", "delete"}, {"/", "filter"}, {":", "cmd"}, {"T", "theme"}, {"?", "help"}, {"q", "quit"}}
-		} else {
+		switch m.kind {
+		case kindCompose:
+			tokens = [][2]string{{"↑↓", "move"}, {"⏎", "services"}, {"u", "up"}, {"d", "down"}, {"r", "restart"}, {"b", "build"}, {"B", "no-cache"}, {":", "cmd"}, {"?", "help"}, {"q", "quit"}}
+		case kindContainers:
+			tokens = [][2]string{{"↑↓", "move"}, {"⏎", "logs"}, {"s", "start/stop"}, {"r", "restart"}, {"e", "exec"}, {"i", "inspect"}, {"d", "delete"}, {"space", "mark"}, {"/", "filter"}, {":", "cmd"}, {"?", "help"}, {"q", "quit"}}
+			if len(m.marked) > 0 {
+				tokens = [][2]string{{"↑↓", "move"}, {"space", "mark"}, {"a", "all"}, {"s", "start"}, {"S", "stop"}, {"r", "restart"}, {"d", "delete"}, {"esc", "clear"}, {":", "cmd"}, {"?", "help"}, {"q", "quit"}}
+			}
+		case kindImages:
+			tokens = [][2]string{{"↑↓", "move"}, {"⏎", "layers"}, {"d", "delete"}, {"/", "filter"}, {":", "cmd"}, {"T", "theme"}, {"?", "help"}, {"q", "quit"}}
+		default:
 			tokens = [][2]string{{"↑↓", "move"}, {"d", "delete"}, {"/", "filter"}, {":", "cmd"}, {"T", "theme"}, {"?", "help"}, {"q", "quit"}}
 		}
 	}
@@ -312,6 +318,12 @@ func (m model) overlayView() string {
 		return m.helpBox()
 	case ovConfirm:
 		return m.confirmBox()
+	case ovContext:
+		return m.contextBox()
+	case ovOpLog:
+		return m.opLogBox()
+	case ovPrune:
+		return m.pruneBox()
 	}
 	return ""
 }
@@ -351,24 +363,30 @@ func (m model) helpBox() string {
 	global := section("Global", [][2]string{
 		{"↑/k ↓/j", "move"}, {"g / G", "top / bottom"}, {"/", "fuzzy filter"},
 		{":", "command palette"}, {"T", "cycle theme"}, {"R", "refresh"},
-		{"H", "compact hints"}, {"F", "frame style"},
+		{"H", "compact hints"}, {"F", "frame style"}, {"@", "operation log"},
 		{"?", "this help"}, {"q", "quit"},
 	})
 	containers := section("Containers", [][2]string{
 		{"⏎ / l", "logs + stats"}, {"i", "inspect"}, {"s", "start/stop"},
 		{"r", "restart"}, {"p", "pause/unpause"}, {"e", "exec shell"},
-		{"d", "remove"}, {"K", "kill"},
+		{"d", "remove"}, {"K", "kill"}, {"space / a", "mark / mark all"},
+		{"s/S/r/d", "bulk on marked"},
 	})
 	detail := section("Logs / Detail", [][2]string{
 		{"↑↓ pgup", "scroll"}, {"f", "toggle follow"}, {"t", "timestamps"},
 		{"/", "search logs"}, {"n / N", "next / prev match"}, {"esc", "back"},
 	})
+	compose := section("Compose", [][2]string{
+		{"⏎", "services"}, {"u", "up -d"}, {"d", "down"}, {"r", "restart"},
+		{"b / B", "build / --no-cache"},
+	})
 	cmds := section("Commands ( : )", [][2]string{
-		{"images", "show images"}, {"volumes", "show volumes"},
-		{"networks", "show networks"}, {"prune", "prune current kind"},
+		{"compose", "compose projects"}, {"images", "images (⏎ = layers)"},
+		{"volumes / networks", "other resources"}, {"context", "switch host"},
+		{"prune", "prune dashboard"}, {"oplog", "operation log"},
 	})
 	left := lipgloss.JoinVertical(lipgloss.Left, global, containers)
-	right := lipgloss.JoinVertical(lipgloss.Left, detail, cmds)
+	right := lipgloss.JoinVertical(lipgloss.Left, detail, compose, cmds)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", right)
 	title := m.s.appName.Render("Contalyst") + m.s.hintDesc.Render("  — keybindings")
 	return m.s.panel.Padding(1, 2).Render(lipgloss.JoinVertical(lipgloss.Left, title, "", body))

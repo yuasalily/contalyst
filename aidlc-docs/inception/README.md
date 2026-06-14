@@ -22,8 +22,9 @@
 - **ナビゲーション**: k9s 流リソース一覧 + Zellij 流カラフルヒントバー + oxker 流分割詳細（DR-3）
 - **判断基準**: 既存類似 TUI と比較して **UX が最良**であること
 
-## 次フェーズ
+## スコープの状態
 
-Construction フェーズ（各 Unit of Work U0→U8 の HOW＝設計・実装）は **完了済み**です。
-設計・実装ドキュメントは [`../construction/`](../construction/) を参照してください
-（アーキテクチャ、実装ステータス、開発者ガイド、既知の課題）。MVP は全 Unit 実装済みです。
+- **MVP（M1–M4 / U0–U8）**: Construction フェーズ（HOW＝設計・実装）**完了済み**。設計・実装ドキュメントは [`../construction/`](../construction/) を参照（アーキテクチャ、実装ステータス、開発者ガイド、既知の課題）。全 Unit 実装済み。
+- **v2（M5–M8 / U9–U12）**: 旧 Out of Scope の 4 領域（**docker-compose 一級サポート / バルク操作 / 複数ホスト / メンテナンスビュー**）を本 inception 更新でスコープへ昇格（2026-06-14、DR-7）。要件・ストーリー・UX・作業単位は各ドキュメントの「v2」セクション参照。次フェーズは v2 の Construction。
+
+> Swarm・フルマウス対応・ログのファイル保存・プラグイン/設定ファイルは引き続き Out of Scope（[00-inception.md](./00-inception.md) §5.3）。

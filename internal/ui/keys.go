@@ -40,6 +40,20 @@ type keyMap struct {
 	Search     key.Binding
 	SearchNext key.Binding
 	SearchPrev key.Binding
+
+	// Compose project view (U9).
+	ComposeUp      key.Binding
+	ComposeDown    key.Binding
+	ComposeBuild   key.Binding
+	ComposeBuildNC key.Binding
+
+	// Bulk / multi-select (U10).
+	Mark     key.Binding
+	MarkAll  key.Binding
+	BulkStop key.Binding
+
+	// Maintenance (U12).
+	OpLog key.Binding
 }
 
 func defaultKeys() keyMap {
@@ -74,5 +88,16 @@ func defaultKeys() keyMap {
 		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 		SearchNext: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
 		SearchPrev: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match")),
+
+		ComposeUp:      key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "up")),
+		ComposeDown:    key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "down")),
+		ComposeBuild:   key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "build")),
+		ComposeBuildNC: key.NewBinding(key.WithKeys("B"), key.WithHelp("B", "build --no-cache")),
+
+		Mark:     key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "mark")),
+		MarkAll:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "mark all")),
+		BulkStop: key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "stop marked")),
+
+		OpLog: key.NewBinding(key.WithKeys("@"), key.WithHelp("@", "op log")),
 	}
 }

@@ -157,6 +157,60 @@ func TestE2E_ResourceLists(t *testing.T) {
 	}
 }
 
+// TestE2E_MaintenanceReads covers the v2 read-only maintenance paths (U12):
+// disk-usage summary and image-layer history against the live daemon.
+func TestE2E_MaintenanceReads(t *testing.T) {
+	c, ctx := newClientOrFatal(t)
+
+	// Ensure at least one image exists, then read its layer history.
+	if out, err := exec.Command("docker", "pull", "busybox:latest").CombinedOutput(); err != nil {
+		t.Fatalf("docker pull busybox: %v\n%s", err, out)
+	}
+	imgs, err := c.Images(ctx)
+	if err != nil {
+		t.Fatalf("Images: %v", err)
+	}
+	if len(imgs) == 0 {
+		t.Skip("no images to read history from")
+	}
+	layers, err := c.ImageHistory(ctx, imgs[0].ID)
+	if err != nil {
+		t.Fatalf("ImageHistory: %v", err)
+	}
+	if len(layers) == 0 {
+		t.Errorf("expected at least one layer for %s", imgs[0].ID)
+	}
+
+	// Disk usage must return the full set of prune categories without erroring.
+	usage, err := c.DiskUsage(ctx)
+	if err != nil {
+		t.Fatalf("DiskUsage: %v", err)
+	}
+	if len(usage) != 5 {
+		t.Errorf("expected 5 prune categories, got %d", len(usage))
+	}
+}
+
+// TestE2E_ComposeAndContexts covers the CLI-backed v2 paths (U9/U11): the
+// compose-availability probe and context enumeration. Both must degrade
+// gracefully rather than error.
+func TestE2E_ComposeAndContexts(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Just assert it does not panic / hang; the result depends on the host.
+	_ = ComposeAvailable(ctx)
+
+	ctxs, err := Contexts(ctx)
+	if err != nil {
+		t.Fatalf("Contexts: %v", err)
+	}
+	// When the docker CLI is present there is always at least the default context.
+	if _, lookErr := exec.LookPath("docker"); lookErr == nil && len(ctxs) == 0 {
+		t.Error("expected at least one docker context")
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, cond func() bool, what string) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)

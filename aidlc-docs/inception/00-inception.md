@@ -4,8 +4,8 @@
 > 「何を、なぜ作るのか (WHAT / WHY)」を定義します。「どう作るか (HOW)」の詳細は Construction フェーズで扱います。
 
 - **Project**: Contalyst — A modern, colorful Docker TUI
-- **Phase**: Inception
-- **Status**: Drafted (承認ゲートはスキップ。判断は本ドキュメント内に記録)
+- **Phase**: Inception（**v2 スコープ拡張で再オープン**）
+- **Status**: MVP (M1–M4 / U0–U8) は Construction 完了・実装済み。本ドキュメントは **v2 拡張** として、旧 Out of Scope の 4 領域（compose / バルク操作 / 複数ホスト / メンテナンスビュー）をスコープへ昇格（承認ゲートはスキップ。判断は本ドキュメント内に記録）。
 - **Last updated**: 2026-06-14
 - **Owner**: yuasalily1011@gmail.com
 
@@ -65,7 +65,7 @@
 
 ## 5. Scope（スコープ）
 
-### 5.1 In Scope（MVP に含む）
+### 5.1 In Scope（MVP — ✅ 実装済み）
 
 - **コンテナ管理**: 一覧（live 更新）、start / stop / restart / pause / unpause / remove / kill。
 - **ログ**: リアルタイム追尾（follow）、スクロール、検索、タイムスタンプ表示切替、truncate しない取得。
@@ -77,22 +77,39 @@
 - **操作性 UI**: 常時表示キーヒントバー、`?` コンテキストヘルプ、破壊的操作の確認ダイアログ。
 - **見た目**: 1 つ以上の良質なカラーテーマ、状態の色分け、角丸フレーム（opt-in）。
 
-### 5.2 Out of Scope（MVP では作らない / 後続）
+### 5.2 In Scope（v2 — 本更新で Out of Scope から昇格）
 
-- docker-compose の一級サポート（up/down/rebuild --no-cache、依存順）→ **競合の最大の隙。Post-MVP の最優先候補**。
+> MVP（U0–U8）完了後、旧 §5.2 Out of Scope のうち以下 4 領域を新たにスコープへ取り込む。AIDLC に従い inception を再オープンして定義（2026-06-14）。要件は [01-requirements.md](./01-requirements.md) の「v2 機能要件」、ストーリーは US-15〜US-21、作業単位は U9〜U12 に対応。
+
+- **docker-compose 一級サポート** (M5・最優先): `com.docker.compose.project` ラベルでプロジェクト/サービスをグルーピングし、`:compose` で一覧。プロジェクト単位の up / down / restart / rebuild（`--no-cache` 含む）、`depends_on` を尊重した依存順、サービス横断のログ集約。→ **競合の最大の隙を埋める最優先領域**（旧 §5.2 で「Post-MVP の最優先候補」と記載）。
+- **バルク / 複数選択操作** (M6): 一覧で複数行をマーク（`Space`）し、start / stop / restart / remove を一括実行。確認は対象件数を明示した 1 ダイアログに集約、実行は並行・個別結果をフィードバック（部分失敗を許容）。
+- **複数ホスト / コンテキスト切替** (M7): Docker context（`~/.docker/contexts` / `DOCKER_CONTEXT` / `DOCKER_HOST`）を列挙し、ランタイムで接続先を切替。ヘッダにアクティブホストを表示。切替時はストリームを teardown して状態を reset。
+- **メンテナンスビュー** (M8): イメージレイヤービュー（history: レイヤー / サイズ / 生成コマンド）、prune ダッシュボード（images / containers / volumes / networks / build cache の再利用可能量を集計し、種別を選択して prune）、操作ログ（lazygit の `@` 相当: 実行した操作を時刻・結果付きで記録・閲覧）。
+
+### 5.3 Out of Scope（v2 でも作らない / さらに後続）
+
 - Docker Swarm（nodes / services / stacks）。
-- 複数 Docker ホスト / リモートコンテキストの切替 UI。
-- イメージレイヤービュー、prune ダッシュボード、操作ログ（lazygit の `@` 相当）。
-- バルク/複数選択操作、マウスのフルサポート、ログのファイル保存。
-- プラグイン機構、設定ファイルによる詳細カスタマイズ（キーバインド再割当は MVP で最小限）。
+- マウスのフルサポート（行クリック / ホイール; 端末のテキスト選択を奪うため opt-in が前提）。
+- ログのファイル保存。
+- プラグイン機構、設定ファイルによる詳細カスタマイズ（キーバインド再割当を含む）。
 
-### 5.3 Release Roadmap（増分計画）
+### 5.4 Release Roadmap（増分計画）
+
+**MVP（完了済み）**
 
 - **M1 — Core Read**: コンテナ一覧 + ログ追尾 + inspect + ヒントバー + 1 テーマ。
 - **M2 — Core Control**: start/stop/restart/remove + 確認ダイアログ + stats + exec。
 - **M3 — Multi-resource**: images / volumes / networks + `:` コマンドパレット + `/` フィルタ。
 - **M4 — Polish**: テーマ複数化、ヘルプ充実、コンパクトヒントバー、パフォーマンス調整。
-- **Post-MVP**: docker-compose 一級サポート、複数ホスト、バルク操作。
+
+**v2（本更新で計画化）**
+
+- **M5 — Compose**: compose プロジェクト/サービスのグルーピング表示 + up/down/restart/rebuild(`--no-cache`) + 依存順 + サービス横断ログ。(U9)
+- **M6 — Bulk Actions**: 複数選択（`Space`）+ 一括 start/stop/restart/remove + 件数明示の集約確認。(U10)
+- **M7 — Multi-host**: Docker context 列挙 + ランタイム切替 + ヘッダのアクティブホスト表示。(U11)
+- **M8 — Maintenance**: イメージレイヤービュー + prune ダッシュボード + 操作ログ。(U12)
+
+**Post-v2**: Docker Swarm、フルマウス対応、ログのファイル保存、プラグイン/設定ファイル。
 
 ---
 
@@ -125,6 +142,8 @@ Bubble Tea の **The Elm Architecture (Model–Update–View)** に従う。
 | フォーム/ダイアログ | `charmbracelet/huh`（任意） | **MIT** | 確認ダイアログに有用 |
 | Docker SDK | `github.com/docker/docker/client` | **Apache-2.0** | 採用 |
 | ログ多重分離 | `github.com/docker/docker/pkg/stdcopy` | **Apache-2.0** | TTY なしストリームの demux に必須 |
+| compose（v2 候補） | `docker compose` CLI シェルアウト | — | **DR-5: 既定戦略**。バイナリ外依存（R9） |
+| compose 純 Go（v2 代替案） | `github.com/compose-spec/compose-go` | **Apache-2.0** | OQ-4 で評価。単一バイナリ方針に合致するが実装量大 |
 
 > **License Decision (DR-1)**: ユーザーは Bubble Tea を明示的に指定したが、Bubble Tea とその周辺（Lip Gloss / Bubbles 等）は **MIT** であり、指定された「Apache-2.0」とは異なる。MIT は Apache-2.0 と同等以上に寛容（permissive）で、同一バイナリへの結合・再配布に法的支障はない。「カラフルでモダンな見た目」という要件達成には Lip Gloss が事実上不可欠。
 > → **結論**: Charm エコシステム（MIT）は Bubble Tea 指定に内包されるものとして採用。**Charm 以外の依存はすべて Apache-2.0 に限定**（Docker SDK が該当）し、GPL/LGPL/MPL 等のコピーレフトは一切採用しない。本判断は承認不要の方針に従い確定とする。
@@ -174,6 +193,15 @@ Bubble Tea の **The Elm Architecture (Model–Update–View)** に従う。
 | R7 | ストリーミング goroutine のリーク | メモリ増加・不安定 | context によるキャンセルと購読解除の徹底 |
 | R8 | MIT 採用が Apache-2.0 指定と齟齬 | ライセンス方針の不整合 | DR-1 で明文化済み。NOTICE/ライセンス表記を同梱 |
 
+**v2 で追加するリスク**
+
+| # | リスク | 影響 | 対策 |
+|---|---|---|---|
+| R9 | compose 機能が `docker compose` プラグインへのシェルアウトに依存（単一バイナリ方針 NFR-M2 と齟齬） | compose 未導入環境で機能不全 | exec と同方針（KI-2/CR-6）。未導入なら compose ビューを無効化し原因を通知。将来は compose-go（Apache-2.0）で純 Go 化を検討（OQ-4） |
+| R10 | バルク操作の部分失敗（一部成功・一部失敗） | 状態の不整合・誤認 | 全体ロールバックはせず、対象ごとの成功/失敗を集約表示。確認ダイアログで件数を明示 |
+| R11 | コンテキスト切替時のストリームリーク / 旧ホストの状態混在 | リーク・誤情報表示 | 切替時に全購読を teardown し、選択行・フィルタ・ドリルダウンスタックを reset。接続失敗は R2/E3 と同じく非クラッシュ通知 |
+| R12 | prune の誤実行で広範なデータ消失（build cache / volumes 含む） | データ損失 | 種別ごとに再利用可能量を明示し、選択 + 確認を必須化。既定フォーカスは安全側（R5 と同方針） |
+
 ---
 
 ## 9. Priorities & Trade-offs（優先順位とトレードオフ）
@@ -184,7 +212,8 @@ Bubble Tea の **The Elm Architecture (Model–Update–View)** に従う。
 | 見た目（カラフル/モダン） | ◎ 要件 | 個別配色は調整可 |
 | 機能の網羅性 | | ○ MVP を絞り段階的に拡張 |
 | 開発スピード | | ○ |
-| docker-compose 等の高度機能 | | △ Post-MVP |
+| docker-compose 一級サポート | ◎ v2 最優先（M5） | 実装戦略は交渉可（OQ-4） |
+| バルク操作 / 複数ホスト / メンテナンスビュー | | ○ v2（M6–M8）で段階的に |
 
 **トレードオフ方針**: 機能数より「少数の主要フローを最高の操作性で」。迷ったら *simplicity を power に優先する*（Zellij の哲学）。
 
@@ -194,12 +223,21 @@ Bubble Tea の **The Elm Architecture (Model–Update–View)** に従う。
 
 ROM（ラフな見積り、AIDLC の "bolt" 単位で実行想定）:
 
+MVP（完了済み）:
+
 - M1 Core Read: 小〜中
 - M2 Core Control: 中
 - M3 Multi-resource: 中
 - M4 Polish: 小
 
-各マイルストーンは [05-units-of-work.md](./05-units-of-work.md) の Unit に対応し、並行実行可能な単位へ分解する。
+v2（本更新で計画化）:
+
+- M5 Compose: 中〜大（compose 戦略の選定・依存順・グルーピングが中核）
+- M6 Bulk Actions: 小〜中（既存テーブル/確認ダイアログを再利用）
+- M7 Multi-host: 中（ランタイム再接続・状態 reset が注意点）
+- M8 Maintenance: 中（3 ビューの合算。各々は小〜中）
+
+各マイルストーンは [05-units-of-work.md](./05-units-of-work.md) の Unit（MVP は U0–U8、v2 は U9–U12）に対応し、並行実行可能な単位へ分解する。
 
 ---
 
@@ -213,17 +251,26 @@ ROM（ラフな見積り、AIDLC の "bolt" 単位で実行想定）:
 | DR-2 | 2026-06-14 | Docker SDK は公式 `docker/docker/client`、`dockerx` で隔離 | API ネゴシエーション、将来の moby 移行に備える |
 | DR-3 | 2026-06-14 | ナビは k9s 流一覧 + Zellij 流ヒントバー + oxker 流分割詳細 | 各ツール比較で最良 UX |
 | DR-4 | 2026-06-14 | プロダクト名は **Contalyst** | リポジトリ名に一致、container+catalyst |
+| DR-5 | 2026-06-14 | compose は `docker compose` CLI へのシェルアウトを既定戦略とする（exec と同方針） | SDK に compose 機能はなく、`docker compose` の挙動互換が最も確実。exec で既にシェルアウトしておりリスク許容済み（KI-2）。純 Go 化は OQ-4 で継続検討 |
+| DR-6 | 2026-06-14 | 複数ホストは Docker context（`~/.docker/contexts` + `DOCKER_CONTEXT`/`DOCKER_HOST`）を情報源とし、`dockerx` でクライアントを再生成して切替 | Docker 標準のコンテキスト機構に追従。`dockerx` 隔離（NFR-M1）の範囲で再接続を局所化 |
+| DR-7 | 2026-06-14 | 旧 Out of Scope の 4 領域（compose / バルク / 複数ホスト / メンテナンス）を v2 としてスコープへ昇格。Swarm・フルマウス・ログ保存・プラグインは引き続き Out of Scope | MVP 完了を受け、競合差別化（compose）と運用価値（複数ホスト/バルク/メンテナンス）の高い順に拡張。Swarm 等は需要・複雑度の観点で据え置き |
 
 ### 未解決事項 (Open Questions)
 
 | ID | 質問 | 暫定方針 |
 |---|---|---|
-| OQ-1 | Lip Gloss は v1 / v2 どちらを採用するか | Construction 時の安定度で判断。v2 は AdaptiveColor 廃止に注意 |
-| OQ-2 | 確認ダイアログは huh を使うか自前 overlay か | プロトタイプで比較し UX が良い方 |
+| OQ-1 | Lip Gloss は v1 / v2 どちらを採用するか | Construction 時の安定度で判断。v2 は AdaptiveColor 廃止に注意（MVP: v1 採用済み / CR-1） |
+| OQ-2 | 確認ダイアログは huh を使うか自前 overlay か | プロトタイプで比較し UX が良い方（MVP: 自前 overlay 採用済み） |
 | OQ-3 | テーマ定義の形式（埋め込み Go / 設定ファイル） | MVP は埋め込み、後続で外部化検討 |
+| OQ-4 | compose 実装は `docker compose` シェルアウト（DR-5）か compose-go（Apache-2.0）ライブラリか | M5 着手時に再評価。単一バイナリ方針（NFR-M2）と互換性のトレードオフ。暫定はシェルアウト |
+| OQ-5 | コンテキスト切替時、選択行/フィルタ/履歴をホストごとに保持するか全 reset するか | M7 で UX を比較。暫定は全 reset（R11 のリーク回避を優先） |
+| OQ-6 | 操作ログ（M8）は永続化するか（セッション内メモリのみ / ファイル保存） | ログのファイル保存は Out of Scope のため、暫定はセッション内リングバッファ |
 
 ---
 
 ## 12. Sign-off（承認ゲート）
 
-AIDLC 本来の承認ゲートはユーザー方針によりスキップ。本ドキュメントの確定をもって Construction フェーズ（HOW の設計・実装）へ進む。
+AIDLC 本来の承認ゲートはユーザー方針によりスキップ。
+
+- **MVP（M1–M4 / U0–U8）**: Construction 完了・実装済み（[`../construction/`](../construction/) 参照）。
+- **v2（M5–M8 / U9–U12）**: 本ドキュメントの確定をもって Construction フェーズ（HOW の設計・実装）へ進む。

@@ -45,6 +45,12 @@ Direct dependencies and the versions in use:
 | `github.com/docker/docker` | v28.5.2+incompatible | Apache-2.0 | Docker Engine SDK |
 | `github.com/mattn/go-runewidth` | v0.0.24 | MIT | display-width-correct padding/truncation |
 
+> **v2 added no new dependencies.** Compose and context support shell out to the
+> `docker` / `docker compose` CLIs (CR-9/CR-10, same approach as `exec`/CR-6);
+> the layer/disk-usage/history reads use the existing Docker SDK. Bulk fan-out
+> uses the stdlib `sync` package. The dependency/license table above is
+> unchanged by v2.
+
 **License policy (inception DR-1):** the user specified Apache-2.0 for libraries
 but explicitly named Bubble Tea, which (with Lip Gloss/Bubbles) is MIT. Resolved:
 the Charm ecosystem (MIT) is accepted as part of the Bubble Tea choice; every
