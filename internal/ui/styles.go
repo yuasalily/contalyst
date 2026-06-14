@@ -39,9 +39,17 @@ type styles struct {
 	toastErr     lipgloss.Style
 	promptPrefix lipgloss.Style
 	empty        lipgloss.Style
+	searchHit    lipgloss.Style
 }
 
-func newStyles(th theme.Theme) styles {
+// newStyles derives every style from a Theme. When rounded is false the framed
+// panels/dialog fall back to a plain square border, making the rounded-frame
+// decoration opt-in (inception NFR-U5).
+func newStyles(th theme.Theme, rounded bool) styles {
+	border := lipgloss.NormalBorder()
+	if rounded {
+		border = lipgloss.RoundedBorder()
+	}
 	return styles{
 		th: th,
 
@@ -60,11 +68,11 @@ func newStyles(th theme.Theme) styles {
 		hintDesc: lipgloss.NewStyle().Foreground(th.Muted),
 		hintSep:  lipgloss.NewStyle().Foreground(th.Subtle),
 
-		panel:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(th.Border),
-		panelFocus: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(th.BorderFocus),
+		panel:      lipgloss.NewStyle().Border(border).BorderForeground(th.Border),
+		panelFocus: lipgloss.NewStyle().Border(border).BorderForeground(th.BorderFocus),
 		panelTitle: lipgloss.NewStyle().Bold(true).Foreground(th.Accent),
 
-		dialog:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(th.Danger).Padding(1, 3),
+		dialog:       lipgloss.NewStyle().Border(border).BorderForeground(th.Danger).Padding(1, 3),
 		dialogTitle:  lipgloss.NewStyle().Bold(true).Foreground(th.Fg),
 		btnActive:    lipgloss.NewStyle().Background(th.Accent).Foreground(th.SelBg).Bold(true).Padding(0, 2),
 		btnInactive:  lipgloss.NewStyle().Foreground(th.Muted).Padding(0, 2),
@@ -73,5 +81,6 @@ func newStyles(th theme.Theme) styles {
 		toastErr:     lipgloss.NewStyle().Foreground(th.Danger).Bold(true),
 		promptPrefix: lipgloss.NewStyle().Bold(true).Foreground(th.Accent),
 		empty:        lipgloss.NewStyle().Foreground(th.Muted).Italic(true),
+		searchHit:    lipgloss.NewStyle().Background(th.Accent2).Foreground(th.SelBg).Bold(true),
 	}
 }

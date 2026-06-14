@@ -38,7 +38,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "contalyst:", err)
 		os.Exit(1)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	p := tea.NewProgram(ui.New(client), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

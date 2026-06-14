@@ -67,6 +67,33 @@ func (m model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// --- in-log search (inception FR-C5) ---
+
+func (m model) updateLogSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.overlay = ovNone
+		m.searchInput.Blur()
+		m.detail.search = ""
+		m.detail.matches = nil
+		m.detail.matchIdx = 0
+		m.detail.logs.SetContent(strings.Join(m.detail.lines, "\n"))
+		return m, nil
+	case "enter":
+		m.overlay = ovNone
+		m.searchInput.Blur()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.searchInput, cmd = m.searchInput.Update(msg)
+	m.detail.search = m.searchInput.Value()
+	m.detail.matchIdx = 0
+	m.computeMatches()
+	m.detail.logs.SetContent(m.renderLogContent())
+	m.jumpToMatch()
+	return m, cmd
+}
+
 // --- command palette ---
 
 var commandNames = []string{"containers", "images", "volumes", "networks", "prune", "theme", "help", "quit"}
@@ -189,6 +216,16 @@ func (m model) bottomView() string {
 			suffix = "   " + m.s.hintDesc.Render("⇥ "+sug)
 		}
 		return m.s.promptPrefix.Render(":") + " " + m.cmdInput.View() + suffix
+	case ovLogSearch:
+		count := ""
+		if m.detail.search != "" {
+			if n := len(m.detail.matches); n > 0 {
+				count = "   " + m.s.hintDesc.Render(fmt.Sprintf("%d/%d", m.detail.matchIdx+1, n))
+			} else {
+				count = "   " + m.s.hintDesc.Render("no matches")
+			}
+		}
+		return m.s.promptPrefix.Render("/") + " " + m.searchInput.View() + count
 	default:
 		return m.hintView()
 	}
@@ -198,7 +235,11 @@ func (m model) hintView() string {
 	var tokens [][2]string
 	switch m.state {
 	case stateDetail:
-		tokens = [][2]string{{"↑↓", "scroll"}, {"f", "follow"}, {"t", "timestamps"}, {"esc", "back"}, {"?", "help"}, {"q", "quit"}}
+		tokens = [][2]string{{"↑↓", "scroll"}, {"f", "follow"}, {"t", "timestamps"}, {"/", "search"}}
+		if m.detail.search != "" {
+			tokens = append(tokens, [2]string{"n/N", "next/prev"})
+		}
+		tokens = append(tokens, [][2]string{{"esc", "back"}, {"?", "help"}, {"q", "quit"}}...)
 	case stateInspect:
 		tokens = [][2]string{{"↑↓", "scroll"}, {"esc", "back"}, {"?", "help"}, {"q", "quit"}}
 	default:
@@ -310,6 +351,7 @@ func (m model) helpBox() string {
 	global := section("Global", [][2]string{
 		{"↑/k ↓/j", "move"}, {"g / G", "top / bottom"}, {"/", "fuzzy filter"},
 		{":", "command palette"}, {"T", "cycle theme"}, {"R", "refresh"},
+		{"H", "compact hints"}, {"F", "frame style"},
 		{"?", "this help"}, {"q", "quit"},
 	})
 	containers := section("Containers", [][2]string{
@@ -318,7 +360,8 @@ func (m model) helpBox() string {
 		{"d", "remove"}, {"K", "kill"},
 	})
 	detail := section("Logs / Detail", [][2]string{
-		{"↑↓ pgup", "scroll"}, {"f", "toggle follow"}, {"t", "timestamps"}, {"esc", "back"},
+		{"↑↓ pgup", "scroll"}, {"f", "toggle follow"}, {"t", "timestamps"},
+		{"/", "search logs"}, {"n / N", "next / prev match"}, {"esc", "back"},
 	})
 	cmds := section("Commands ( : )", [][2]string{
 		{"images", "show images"}, {"volumes", "show volumes"},

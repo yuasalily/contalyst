@@ -20,6 +20,10 @@ type keyMap struct {
 	Refresh key.Binding
 	Quit    key.Binding
 
+	// Layout / decoration toggles.
+	CompactHints key.Binding
+	Frame        key.Binding
+
 	// Container actions.
 	StartStop key.Binding
 	Restart   key.Binding
@@ -33,6 +37,9 @@ type keyMap struct {
 	// Detail view.
 	Follow     key.Binding
 	Timestamps key.Binding
+	Search     key.Binding
+	SearchNext key.Binding
+	SearchPrev key.Binding
 }
 
 func defaultKeys() keyMap {
@@ -50,6 +57,9 @@ func defaultKeys() keyMap {
 		Refresh: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh")),
 		Quit:    key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 
+		CompactHints: key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "compact hints")),
+		Frame:        key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "frame style")),
+
 		StartStop: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "start/stop")),
 		Restart:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restart")),
 		Pause:     key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pause")),
@@ -61,5 +71,8 @@ func defaultKeys() keyMap {
 
 		Follow:     key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "follow")),
 		Timestamps: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "timestamps")),
+		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+		SearchNext: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
+		SearchPrev: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match")),
 	}
 }

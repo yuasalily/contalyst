@@ -5,8 +5,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
+
+func TestUnit_HighlightMatches(t *testing.T) {
+	style := lipgloss.NewStyle() // no-op styling keeps output comparable
+	cases := []struct {
+		line, query, want string
+	}{
+		{"hello world", "", "hello world"},      // empty query is a no-op
+		{"hello world", "xyz", "hello world"},   // no match is verbatim
+		{"hello world", "o", "hello world"},     // matches survive round-trip
+		{"Error: boom", "error", "Error: boom"}, // case-insensitive, original case kept
+		{"aXaXa", "x", "aXaXa"},                 // multiple matches
+	}
+	for _, c := range cases {
+		got := highlightMatches(c.line, c.query, style)
+		if got != c.want {
+			t.Errorf("highlightMatches(%q,%q)=%q, want %q", c.line, c.query, got, c.want)
+		}
+	}
+}
 
 func TestUnit_Pad(t *testing.T) {
 	cases := []struct {

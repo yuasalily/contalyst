@@ -26,8 +26,9 @@ T theme · ? help · q quit
 
 - **Live container list** with state shown by color *and* glyph (`●` running,
   `○` exited, `‖` paused, `◐` restarting/created).
-- **Log streaming** with follow, scroll-to-pause, and a timestamp toggle —
-  correctly demultiplexed for both TTY and non-TTY containers.
+- **Log streaming** with follow, scroll-to-pause, a timestamp toggle, and
+  in-log search (`/`, then `n`/`N` to jump between matches) — correctly
+  demultiplexed for both TTY and non-TTY containers.
 - **Live stats** — CPU / memory bars, network and block I/O, PIDs.
 - **Lifecycle actions** — start / stop / restart / pause / kill / remove, each
   destructive one guarded by a confirmation dialog that defaults to *Cancel*.
@@ -36,7 +37,8 @@ T theme · ? help · q quit
 - **Images, volumes, networks** — list, remove, and prune.
 - **`/` fuzzy filter** and a **`:` command palette** (`:images`, `:volumes`,
   `:networks`, `:prune`, `:theme`, …) for fast navigation.
-- **Themes** — Catalyst (default), Aurora, Mono — cycle live with `T`.
+- **Themes** — Catalyst (default), Aurora, Mono — cycle live with `T`. Toggle a
+  compact one-line hint bar with `H` and rounded/square frames with `F`.
 - **Discoverable** — a context-sensitive hint bar is always on screen, and `?`
   opens full keybindings. No docs required.
 
@@ -79,6 +81,8 @@ range of Engine versions.
 | `:` | command palette | | `K` | kill |
 | `T` | cycle theme | | `f` | toggle log follow |
 | `R` | refresh | | `t` | toggle timestamps |
+| `H` | compact hint bar | | `/` | search logs (in detail) |
+| `F` | rounded/square frames | | `n` / `N` | next / prev log match |
 | `?` | help | | `esc` | back / cancel |
 | `q` | quit | | | |
 
