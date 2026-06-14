@@ -60,6 +60,7 @@ jobs:
       - name: Functional tests
         run: go test ${{ matrix.race }} -run TestFunctional ./...
       - name: Coverage (unit + functional)
+        if: matrix.os == 'ubuntu-latest'
         run: go test ${{ matrix.race }} -covermode=atomic -coverprofile=coverage.out ./...
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
