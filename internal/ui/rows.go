@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 	"github.com/yuasalily/contalyst/internal/ui/theme"
 )
 
@@ -70,7 +70,7 @@ func (m *model) buildContainers() {
 // buildCompose lists docker-compose projects grouped from the container cache
 // (U9 / FR-CMP1). The aggregate state (up/degraded/down) is color-coded.
 func (m *model) buildCompose() {
-	m.composeProjects = dockerx.ComposeProjects(m.containers)
+	m.composeProjects = engine.ComposeProjects(m.containers)
 	if !m.composeAvail {
 		m.lst.emptyMsg = "no compose projects (or `docker compose` is unavailable)"
 	}

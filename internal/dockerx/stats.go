@@ -5,31 +5,19 @@ import (
 	"encoding/json"
 
 	"github.com/docker/docker/api/types/container"
-)
 
-// Stats is a single sampled snapshot of a container's resource usage.
-type Stats struct {
-	CPUPercent float64
-	MemUsage   uint64
-	MemLimit   uint64
-	MemPercent float64
-	NetRx      uint64
-	NetTx      uint64
-	BlkRead    uint64
-	BlkWrite   uint64
-	Pids       uint64
-	Err        error
-}
+	"github.com/yuasalily/contalyst/internal/engine"
+)
 
 // StatsStream streams resource usage for a container roughly once per second.
 // The caller cancels ctx to stop; the channel closes when the stream ends.
-func (c *Client) StatsStream(ctx context.Context, id string) (<-chan Stats, error) {
+func (c *Client) StatsStream(ctx context.Context, id string) (<-chan engine.Stats, error) {
 	resp, err := c.api.ContainerStats(ctx, id, true)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(chan Stats, 8)
+	out := make(chan engine.Stats, 8)
 	go func() {
 		defer close(out)
 		defer func() { _ = resp.Body.Close() }()
@@ -42,7 +30,7 @@ func (c *Client) StatsStream(ctx context.Context, id string) (<-chan Stats, erro
 			if err := dec.Decode(&raw); err != nil {
 				if ctx.Err() == nil {
 					select {
-					case out <- Stats{Err: err}:
+					case out <- engine.Stats{Err: err}:
 					case <-ctx.Done():
 					}
 				}
@@ -61,8 +49,8 @@ func (c *Client) StatsStream(ctx context.Context, id string) (<-chan Stats, erro
 // computeStats derives human-meaningful figures from a raw stats sample. CPU%
 // must be computed from the delta between the current and previous samples
 // (inception FR-C11), not read directly.
-func computeStats(s container.StatsResponse) Stats {
-	out := Stats{
+func computeStats(s container.StatsResponse) engine.Stats {
+	out := engine.Stats{
 		MemUsage: s.MemoryStats.Usage,
 		MemLimit: s.MemoryStats.Limit,
 		Pids:     s.PidsStats.Current,

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 func dockerRun(t *testing.T, args ...string) {
@@ -53,7 +55,7 @@ func TestE2E_ContainerLifecycleAndStreams(t *testing.T) {
 	defer dockerRm(name)
 
 	// List must include our container, running.
-	var target Container
+	var target engine.Container
 	waitFor(t, 10*time.Second, func() bool {
 		cs, err := c.Containers(ctx)
 		if err != nil {
@@ -199,7 +201,12 @@ func TestE2E_ComposeAndContexts(t *testing.T) {
 	defer cancel()
 
 	// Just assert it does not panic / hang; the result depends on the host.
-	_ = ComposeAvailable(ctx)
+	c, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	defer func() { _ = c.Close() }()
+	_ = c.ComposeAvailable(ctx)
 
 	ctxs, err := Contexts(ctx)
 	if err != nil {

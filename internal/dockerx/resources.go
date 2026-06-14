@@ -10,23 +10,16 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
+
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
-// Image is the UI-facing view model for an image.
-type Image struct {
-	ID      string
-	Repo    string
-	Tag     string
-	Size    int64
-	Created time.Time
-}
-
-func (c *Client) Images(ctx context.Context) ([]Image, error) {
+func (c *Client) Images(ctx context.Context) ([]engine.Image, error) {
 	list, err := c.api.ImageList(ctx, image.ListOptions{All: false})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Image, 0, len(list))
+	out := make([]engine.Image, 0, len(list))
 	for _, im := range list {
 		repo, tag := "<none>", "<none>"
 		if len(im.RepoTags) > 0 {
@@ -34,7 +27,7 @@ func (c *Client) Images(ctx context.Context) ([]Image, error) {
 				repo, tag = r, t
 			}
 		}
-		out = append(out, Image{
+		out = append(out, engine.Image{
 			ID:      strings.TrimPrefix(im.ID, "sha256:")[:12],
 			Repo:    repo,
 			Tag:     tag,
@@ -56,21 +49,14 @@ func (c *Client) PruneImages(ctx context.Context) error {
 	return err
 }
 
-// Volume is the UI-facing view model for a volume.
-type Volume struct {
-	Name       string
-	Driver     string
-	Mountpoint string
-}
-
-func (c *Client) Volumes(ctx context.Context) ([]Volume, error) {
+func (c *Client) Volumes(ctx context.Context) ([]engine.Volume, error) {
 	resp, err := c.api.VolumeList(ctx, volume.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Volume, 0, len(resp.Volumes))
+	out := make([]engine.Volume, 0, len(resp.Volumes))
 	for _, v := range resp.Volumes {
-		out = append(out, Volume{Name: v.Name, Driver: v.Driver, Mountpoint: v.Mountpoint})
+		out = append(out, engine.Volume{Name: v.Name, Driver: v.Driver, Mountpoint: v.Mountpoint})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -85,26 +71,18 @@ func (c *Client) PruneVolumes(ctx context.Context) error {
 	return err
 }
 
-// Network is the UI-facing view model for a network.
-type Network struct {
-	ID     string
-	Name   string
-	Driver string
-	Scope  string
-}
-
-func (c *Client) Networks(ctx context.Context) ([]Network, error) {
+func (c *Client) Networks(ctx context.Context) ([]engine.Network, error) {
 	list, err := c.api.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Network, 0, len(list))
+	out := make([]engine.Network, 0, len(list))
 	for _, n := range list {
 		id := n.ID
 		if len(id) > 12 {
 			id = id[:12]
 		}
-		out = append(out, Network{ID: id, Name: n.Name, Driver: n.Driver, Scope: n.Scope})
+		out = append(out, engine.Network{ID: id, Name: n.Name, Driver: n.Driver, Scope: n.Scope})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil

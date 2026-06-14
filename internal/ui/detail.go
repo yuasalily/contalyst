@@ -10,7 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 const maxLogLines = 5000
@@ -23,17 +23,17 @@ type detailState struct {
 	follow     bool
 	timestamps bool
 	logCancel  context.CancelFunc
-	logCh      <-chan dockerx.LogLine
+	logCh      <-chan engine.LogLine
 
 	// In-log search (inception FR-C5): highlight matches and jump between them.
 	search   string
 	matches  []int // indices into lines that contain the query
 	matchIdx int
 
-	stats       dockerx.Stats
+	stats       engine.Stats
 	haveStats   bool
 	statsCancel context.CancelFunc
-	statsCh     <-chan dockerx.Stats
+	statsCh     <-chan engine.Stats
 	statsWidth  int
 }
 
@@ -133,7 +133,7 @@ func (m model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) handleLogLine(line dockerx.LogLine) (tea.Model, tea.Cmd) {
+func (m model) handleLogLine(line engine.LogLine) (tea.Model, tea.Cmd) {
 	if line.Err != nil {
 		return m, nil // stream ended; keep what we have
 	}

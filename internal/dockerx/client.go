@@ -1,8 +1,9 @@
-// Package dockerx isolates all Docker Engine SDK access behind a small set of
-// domain types and methods. The rest of the application depends on this package
-// rather than on github.com/docker/docker directly, so that the upstream SDK
-// (which is migrating toward github.com/moby/moby) can be swapped without
-// touching the UI. See aidlc-docs/inception NFR-M1 / DR-2.
+// Package dockerx is the Docker adapter for the engine port: it isolates all
+// Docker Engine SDK access behind the github.com/yuasalily/contalyst/internal/engine
+// interface, translating the upstream SDK types into the neutral view models the
+// rest of the application speaks. Swapping the SDK (which is migrating toward
+// github.com/moby/moby) — or adding a sibling adapter such as Podman — touches no
+// UI code. See aidlc-docs/inception NFR-M1 / DR-2.
 package dockerx
 
 import (
@@ -15,12 +16,18 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
-// Client is a thin wrapper over the Docker Engine API client.
+// Client is a thin wrapper over the Docker Engine API client. It implements
+// engine.Engine.
 type Client struct {
 	api *client.Client
 }
+
+// Client satisfies the engine port.
+var _ engine.Engine = (*Client)(nil)
 
 // NewClient connects to the Docker daemon using the standard environment
 // (DOCKER_HOST, etc.) and negotiates the API version so a single binary works
@@ -54,33 +61,15 @@ func (c *Client) ServerVersion(ctx context.Context) string {
 // Close releases the underlying client.
 func (c *Client) Close() error { return c.api.Close() }
 
-// Container is the UI-facing view model for a container.
-type Container struct {
-	ID      string
-	Name    string
-	Image   string
-	State   string // running, exited, paused, created, restarting, removing, dead
-	Status  string // human status, e.g. "Up 2 minutes"
-	Ports   string // compact published-port summary
-	Created time.Time
-
-	// Compose metadata, taken from the com.docker.compose.* labels (empty for
-	// containers not started by compose). Used by the compose project view (U9).
-	Project     string
-	Service     string
-	ConfigFiles string // com.docker.compose.project.config_files
-	WorkingDir  string // com.docker.compose.project.working_dir
-}
-
 // Containers lists all containers (running and stopped), newest first.
-func (c *Client) Containers(ctx context.Context) ([]Container, error) {
+func (c *Client) Containers(ctx context.Context) ([]engine.Container, error) {
 	summaries, err := c.api.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Container, 0, len(summaries))
+	out := make([]engine.Container, 0, len(summaries))
 	for _, s := range summaries {
-		out = append(out, Container{
+		out = append(out, engine.Container{
 			ID:          s.ID,
 			Name:        primaryName(s.Names),
 			Image:       shortImage(s.Image),
@@ -124,6 +113,18 @@ func (c *Client) Kill(ctx context.Context, id string) error {
 
 func (c *Client) Remove(ctx context.Context, id string, force bool) error {
 	return c.api.ContainerRemove(ctx, id, container.RemoveOptions{Force: force})
+}
+
+// ExecSpec returns the `docker exec -it … sh -c '…'` command that opens an
+// interactive shell in the container, preferring bash and falling back to sh
+// (inception FR-C9). The frontend runs it; the docker CLI is virtually always
+// present alongside the daemon and gives a correct interactive PTY for free.
+func (c *Client) ExecSpec(id string) engine.ExecSpec {
+	return engine.ExecSpec{
+		Name: "docker",
+		Args: []string{"exec", "-it", id, "sh", "-c",
+			"command -v bash >/dev/null 2>&1 && exec bash || exec sh"},
+	}
 }
 
 // Inspect returns the raw, indented JSON for a container.

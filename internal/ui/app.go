@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 	"github.com/yuasalily/contalyst/internal/ui/theme"
 )
 
@@ -40,7 +41,7 @@ type connectedMsg struct{ ver string }
 type execDoneMsg struct{ err error }
 
 type model struct {
-	client *dockerx.Client
+	client engine.Engine
 	keys   keyMap
 	th     theme.Theme
 	s      styles
@@ -55,13 +56,13 @@ type model struct {
 	kind    resourceKind
 	lst     list
 
-	containers []dockerx.Container
-	images     []dockerx.Image
-	volumes    []dockerx.Volume
-	networks   []dockerx.Network
+	containers []engine.Container
+	images     []engine.Image
+	volumes    []engine.Volume
+	networks   []engine.Network
 
 	// Compose (U9): projects are derived from the container list.
-	composeProjects []dockerx.ComposeProject
+	composeProjects []engine.ComposeProject
 	composeAvail    bool
 	composeScope    string // when set, the container list is scoped to this project
 
@@ -75,7 +76,7 @@ type model struct {
 
 	// Maintenance (U12): operation log + prune dashboard.
 	opLog       []opEntry
-	pruneUsage  []dockerx.Usage
+	pruneUsage  []engine.Usage
 	pruneSel    []bool
 	pruneCursor int
 
@@ -99,8 +100,8 @@ type inspectState struct {
 	vp    viewport.Model
 }
 
-// New builds the root model around an established Docker client.
-func New(client *dockerx.Client) model {
+// New builds the root model around an established engine connection.
+func New(client engine.Engine) model {
 	th := theme.Default()
 
 	fi := textinput.New()
@@ -133,7 +134,7 @@ func (m model) Init() tea.Cmd {
 	return connectCmd(m.client)
 }
 
-func connectCmd(c *dockerx.Client) tea.Cmd {
+func connectCmd(c engine.Engine) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -196,7 +197,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case connectedMsg:
 		m.ready = true
 		m.serverVer = msg.ver
-		return m, tea.Batch(m.loadCmd(), tickCmd(), composeAvailCmd())
+		return m, tea.Batch(m.loadCmd(), tickCmd(), composeAvailCmd(m.client))
 
 	case composeAvailMsg:
 		m.composeAvail = msg.ok
@@ -221,7 +222,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setToast("context switch failed: "+msg.err.Error(), true)
 		}
 		m.serverVer = msg.ver
-		return m, tea.Batch(m.setToast("switched to "+m.contextName, false), m.loadCmd(), composeAvailCmd())
+		return m, tea.Batch(m.setToast("switched to "+m.contextName, false), m.loadCmd(), composeAvailCmd(m.client))
 
 	case errMsg:
 		if !m.ready {
@@ -237,19 +238,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case containersMsg:
-		m.containers = []dockerx.Container(msg)
+		m.containers = []engine.Container(msg)
 		m.rebuildList()
 		return m, nil
 	case imagesMsg:
-		m.images = []dockerx.Image(msg)
+		m.images = []engine.Image(msg)
 		m.rebuildList()
 		return m, nil
 	case volumesMsg:
-		m.volumes = []dockerx.Volume(msg)
+		m.volumes = []engine.Volume(msg)
 		m.rebuildList()
 		return m, nil
 	case networksMsg:
-		m.networks = []dockerx.Network(msg)
+		m.networks = []engine.Network(msg)
 		m.rebuildList()
 		return m, nil
 
@@ -308,7 +309,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail.logCh = msg.ch
 		return m, waitLogCmd(msg.ch)
 	case logLineMsg:
-		return m.handleLogLine(dockerx.LogLine(msg))
+		return m.handleLogLine(engine.LogLine(msg))
 	case logClosedMsg:
 		return m, nil
 
@@ -316,7 +317,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail.statsCh = msg.ch
 		return m, waitStatsCmd(msg.ch)
 	case statsMsg:
-		m.detail.stats = dockerx.Stats(msg)
+		m.detail.stats = engine.Stats(msg)
 		m.detail.haveStats = true
 		if m.detail.statsCh != nil {
 			return m, waitStatsCmd(m.detail.statsCh)

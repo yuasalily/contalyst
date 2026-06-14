@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 // resourceKind enumerates the resource lists the app can show.
@@ -41,10 +42,10 @@ func (k resourceKind) String() string {
 
 type errMsg struct{ err error }
 
-type containersMsg []dockerx.Container
-type imagesMsg []dockerx.Image
-type volumesMsg []dockerx.Volume
-type networksMsg []dockerx.Network
+type containersMsg []engine.Container
+type imagesMsg []engine.Image
+type volumesMsg []engine.Volume
+type networksMsg []engine.Network
 
 type tickMsg time.Time
 
@@ -61,12 +62,12 @@ type inspectMsg struct {
 }
 
 // streaming
-type logStartedMsg struct{ ch <-chan dockerx.LogLine }
-type logLineMsg dockerx.LogLine
+type logStartedMsg struct{ ch <-chan engine.LogLine }
+type logLineMsg engine.LogLine
 type logClosedMsg struct{}
 
-type statsStartedMsg struct{ ch <-chan dockerx.Stats }
-type statsMsg dockerx.Stats
+type statsStartedMsg struct{ ch <-chan engine.Stats }
+type statsMsg engine.Stats
 type statsClosedMsg struct{}
 
 type toastClearMsg struct{}
@@ -83,12 +84,13 @@ type reconnectedMsg struct {
 
 // --- commands ---
 
-// composeAvailCmd probes for the docker compose plugin once at startup.
-func composeAvailCmd() tea.Cmd {
+// composeAvailCmd probes whether the engine's compose support is usable, once
+// at startup (and after a context switch).
+func composeAvailCmd(c engine.Engine) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return composeAvailMsg{ok: dockerx.ComposeAvailable(ctx)}
+		return composeAvailMsg{ok: c.ComposeAvailable(ctx)}
 	}
 }
 
@@ -107,7 +109,7 @@ func contextsCmd() tea.Cmd {
 
 // reconnectCmd pings a freshly built client after a context switch and fetches
 // its version, without restarting the periodic refresh tick.
-func reconnectCmd(c *dockerx.Client) tea.Cmd {
+func reconnectCmd(c engine.Engine) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -205,7 +207,7 @@ func bulkAction(verb string, ids []string, fn func(ctx context.Context, id strin
 	}
 }
 
-func inspectCmd(c *dockerx.Client, id, name string) tea.Cmd {
+func inspectCmd(c engine.Engine, id, name string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -216,7 +218,7 @@ func inspectCmd(c *dockerx.Client, id, name string) tea.Cmd {
 
 // log stream: started by startLogCmd (using a stored cancelable ctx), then each
 // line is awaited by waitLogCmd which re-issues itself in Update.
-func startLogCmd(ctx context.Context, c *dockerx.Client, id string, ts bool) tea.Cmd {
+func startLogCmd(ctx context.Context, c engine.Engine, id string, ts bool) tea.Cmd {
 	return func() tea.Msg {
 		ch, err := c.LogStream(ctx, id, ts)
 		if err != nil {
@@ -226,7 +228,7 @@ func startLogCmd(ctx context.Context, c *dockerx.Client, id string, ts bool) tea
 	}
 }
 
-func waitLogCmd(ch <-chan dockerx.LogLine) tea.Cmd {
+func waitLogCmd(ch <-chan engine.LogLine) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-ch
 		if !ok {
@@ -236,7 +238,7 @@ func waitLogCmd(ch <-chan dockerx.LogLine) tea.Cmd {
 	}
 }
 
-func startStatsCmd(ctx context.Context, c *dockerx.Client, id string) tea.Cmd {
+func startStatsCmd(ctx context.Context, c engine.Engine, id string) tea.Cmd {
 	return func() tea.Msg {
 		ch, err := c.StatsStream(ctx, id)
 		if err != nil {
@@ -246,7 +248,7 @@ func startStatsCmd(ctx context.Context, c *dockerx.Client, id string) tea.Cmd {
 	}
 }
 
-func waitStatsCmd(ch <-chan dockerx.Stats) tea.Cmd {
+func waitStatsCmd(ch <-chan engine.Stats) tea.Cmd {
 	return func() tea.Msg {
 		s, ok := <-ch
 		if !ok {

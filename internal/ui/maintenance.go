@@ -10,7 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 const maxOpLog = 200
@@ -60,11 +60,11 @@ func (m model) opLogBox() string {
 
 // pruneUsageMsg carries the reclaimable-space summary for the dashboard.
 type pruneUsageMsg struct {
-	usage []dockerx.Usage
+	usage []engine.Usage
 	err   error
 }
 
-func pruneUsageCmd(c *dockerx.Client) tea.Cmd {
+func pruneUsageCmd(c engine.Engine) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -103,7 +103,7 @@ func (m model) updatePrune(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // confirmPrune gathers the selected categories and opens a confirm dialog
 // reporting how much space will be reclaimed (R12: explicit + safe default).
 func (m model) confirmPrune() (tea.Model, tea.Cmd) {
-	var kinds []dockerx.PruneKind
+	var kinds []engine.PruneKind
 	var total int64
 	var labels []string
 	for i, sel := range m.pruneSel {
@@ -125,7 +125,7 @@ func (m model) confirmPrune() (tea.Model, tea.Cmd) {
 }
 
 // bulkPrune prunes every selected category and reports an aggregated result.
-func bulkPrune(cl *dockerx.Client, kinds []dockerx.PruneKind) tea.Cmd {
+func bulkPrune(cl engine.Engine, kinds []engine.PruneKind) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -193,7 +193,7 @@ type layersMsg struct {
 	err   error
 }
 
-func imageLayersCmd(c *dockerx.Client, id, name string) tea.Cmd {
+func imageLayersCmd(c engine.Engine, id, name string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -207,7 +207,7 @@ func imageLayersCmd(c *dockerx.Client, id, name string) tea.Cmd {
 
 // formatLayers renders the layer table shown in the layer view. Pure helper so
 // it is unit-testable.
-func formatLayers(layers []dockerx.Layer) string {
+func formatLayers(layers []engine.Layer) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%-10s  %s\n", "SIZE", "CREATED BY")
 	for _, l := range layers {
