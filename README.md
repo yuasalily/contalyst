@@ -34,9 +34,23 @@ T theme · ? help · q quit
   destructive one guarded by a confirmation dialog that defaults to *Cancel*.
 - **Exec** into a container shell (prefers `bash`, falls back to `sh`).
 - **Inspect** any container as pretty-printed JSON.
-- **Images, volumes, networks** — list, remove, and prune.
-- **`/` fuzzy filter** and a **`:` command palette** (`:images`, `:volumes`,
-  `:networks`, `:prune`, `:theme`, …) for fast navigation.
+- **Images, volumes, networks** — list, remove, and prune. Drill into an image
+  (`⏎`) to see its **layer history** (size + command per layer).
+- **docker-compose** (`:compose`) — projects grouped from compose labels with an
+  aggregate state (up/degraded/down); drill in to a project's services, and run
+  `u` up / `d` down / `r` restart / `b` build / `B` build `--no-cache`
+  (dependency order delegated to `docker compose`).
+- **Bulk / multi-select** — `space` marks rows (`a` all), then `s`/`S`/`r`/`d`
+  act on the whole set; destructive bulk actions confirm with the count and run
+  concurrently, reporting `N ok / M failed`.
+- **Multi-host** — `:context` switches the active Docker host at runtime
+  (enumerated from `docker context`); the active host shows in the header.
+- **Prune dashboard** (`:prune`) — per-category reclaimable space with selective
+  prune behind a confirm dialog.
+- **Operation log** (`@`) — a session history of actions with timestamps and
+  success/failure.
+- **`/` fuzzy filter** and a **`:` command palette** (`:compose`, `:images`,
+  `:volumes`, `:networks`, `:context`, `:prune`, `:oplog`, `:theme`, …).
 - **Themes** — Catalyst (default), Aurora, Mono — cycle live with `T`. Toggle a
   compact one-line hint bar with `H` and rounded/square frames with `F`.
 - **Discoverable** — a context-sensitive hint bar is always on screen, and `?`

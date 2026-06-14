@@ -5,12 +5,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/yuasalily/contalyst/internal/dockerx"
 	"github.com/yuasalily/contalyst/internal/ui/theme"
 )
 
 // rebuildList regenerates the list's columns and rows from the cached data for
 // the active resource kind, applying the current fuzzy filter.
 func (m *model) rebuildList() {
+	// Reset per-kind list decorations; the kind builder re-enables what it needs.
+	m.lst.marked = nil
+	m.lst.emptyMsg = ""
 	switch m.kind {
 	case kindImages:
 		m.buildImages()
@@ -18,12 +24,15 @@ func (m *model) rebuildList() {
 		m.buildVolumes()
 	case kindNetworks:
 		m.buildNetworks()
+	case kindCompose:
+		m.buildCompose()
 	default:
 		m.buildContainers()
 	}
 }
 
 func (m *model) buildContainers() {
+	m.lst.marked = m.marked // enables the bulk-select gutter (U10)
 	m.lst.cols = []column{
 		{title: "", width: 1},
 		{title: "NAME", min: 14},
@@ -35,6 +44,9 @@ func (m *model) buildContainers() {
 	accent2 := m.th.Accent2
 	var rows []listRow
 	for _, c := range m.containers {
+		if m.composeScope != "" && c.Project != m.composeScope {
+			continue
+		}
 		if !m.matches(c.Name, c.Image, c.State) {
 			continue
 		}
@@ -53,6 +65,63 @@ func (m *model) buildContainers() {
 		})
 	}
 	m.lst.setRows(rows)
+}
+
+// buildCompose lists docker-compose projects grouped from the container cache
+// (U9 / FR-CMP1). The aggregate state (up/degraded/down) is color-coded.
+func (m *model) buildCompose() {
+	m.composeProjects = dockerx.ComposeProjects(m.containers)
+	if !m.composeAvail {
+		m.lst.emptyMsg = "no compose projects (or `docker compose` is unavailable)"
+	}
+	m.lst.cols = []column{
+		{title: "", width: 1},
+		{title: "PROJECT", min: 18},
+		{title: "SERVICES", width: 9},
+		{title: "RUNNING", width: 9},
+		{title: "STATE", width: 10},
+	}
+	var rows []listRow
+	for _, p := range m.composeProjects {
+		if !m.matches(p.Name, p.State) {
+			continue
+		}
+		col := composeStateColor(m.th, p.State)
+		rows = append(rows, listRow{
+			id:   p.Name,
+			name: p.Name,
+			cells: []cell{
+				{text: composeStateGlyph(p.State), color: col},
+				{text: p.Name},
+				{text: fmt.Sprintf("%d", p.Services)},
+				{text: fmt.Sprintf("%d/%d", p.Running, p.Containers), faint: true},
+				{text: p.State, color: col},
+			},
+		})
+	}
+	m.lst.setRows(rows)
+}
+
+func composeStateColor(th theme.Theme, state string) lipgloss.Color {
+	switch state {
+	case "up":
+		return th.Running
+	case "degraded":
+		return th.Paused
+	default:
+		return th.Exited
+	}
+}
+
+func composeStateGlyph(state string) string {
+	switch state {
+	case "up":
+		return "●"
+	case "degraded":
+		return "◐"
+	default:
+		return "○"
+	}
 }
 
 func (m *model) buildImages() {

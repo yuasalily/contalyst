@@ -17,10 +17,11 @@ type styles struct {
 	statusInfo lipgloss.Style
 	headerRule lipgloss.Style
 
-	colHeader lipgloss.Style
-	rowNormal lipgloss.Style
-	rowSel    lipgloss.Style
-	cellMuted lipgloss.Style
+	colHeader  lipgloss.Style
+	rowNormal  lipgloss.Style
+	rowSel     lipgloss.Style
+	cellMuted  lipgloss.Style
+	markGutter lipgloss.Style
 
 	hintKey  lipgloss.Style
 	hintDesc lipgloss.Style
@@ -59,10 +60,11 @@ func newStyles(th theme.Theme, rounded bool) styles {
 		statusInfo: lipgloss.NewStyle().Foreground(th.Muted),
 		headerRule: lipgloss.NewStyle().Foreground(th.Subtle),
 
-		colHeader: lipgloss.NewStyle().Bold(true).Foreground(th.Accent2),
-		rowNormal: lipgloss.NewStyle().Foreground(th.Fg),
-		rowSel:    lipgloss.NewStyle().Background(th.SelBg).Foreground(th.SelFg).Bold(true),
-		cellMuted: lipgloss.NewStyle().Foreground(th.Muted),
+		colHeader:  lipgloss.NewStyle().Bold(true).Foreground(th.Accent2),
+		rowNormal:  lipgloss.NewStyle().Foreground(th.Fg),
+		rowSel:     lipgloss.NewStyle().Background(th.SelBg).Foreground(th.SelFg).Bold(true),
+		cellMuted:  lipgloss.NewStyle().Foreground(th.Muted),
+		markGutter: lipgloss.NewStyle().Foreground(th.Accent2).Bold(true),
 
 		hintKey:  lipgloss.NewStyle().Bold(true).Foreground(th.Accent),
 		hintDesc: lipgloss.NewStyle().Foreground(th.Muted),

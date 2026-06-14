@@ -63,6 +63,13 @@ type Container struct {
 	Status  string // human status, e.g. "Up 2 minutes"
 	Ports   string // compact published-port summary
 	Created time.Time
+
+	// Compose metadata, taken from the com.docker.compose.* labels (empty for
+	// containers not started by compose). Used by the compose project view (U9).
+	Project     string
+	Service     string
+	ConfigFiles string // com.docker.compose.project.config_files
+	WorkingDir  string // com.docker.compose.project.working_dir
 }
 
 // Containers lists all containers (running and stopped), newest first.
@@ -74,13 +81,17 @@ func (c *Client) Containers(ctx context.Context) ([]Container, error) {
 	out := make([]Container, 0, len(summaries))
 	for _, s := range summaries {
 		out = append(out, Container{
-			ID:      s.ID,
-			Name:    primaryName(s.Names),
-			Image:   shortImage(s.Image),
-			State:   s.State,
-			Status:  s.Status,
-			Ports:   formatPorts(s.Ports),
-			Created: time.Unix(s.Created, 0),
+			ID:          s.ID,
+			Name:        primaryName(s.Names),
+			Image:       shortImage(s.Image),
+			State:       s.State,
+			Status:      s.Status,
+			Ports:       formatPorts(s.Ports),
+			Created:     time.Unix(s.Created, 0),
+			Project:     s.Labels["com.docker.compose.project"],
+			Service:     s.Labels["com.docker.compose.service"],
+			ConfigFiles: s.Labels["com.docker.compose.project.config_files"],
+			WorkingDir:  s.Labels["com.docker.compose.project.working_dir"],
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Created.After(out[j].Created) })

@@ -19,17 +19,22 @@ contalyst/
 │   │   ├── logs.go              #   log streaming (TTY/non-TTY demux)
 │   │   ├── stats.go             #   stats streaming + CPU%/mem derivation
 │   │   ├── resources.go         #   images / volumes / networks list+remove+prune
+│   │   ├── compose.go           #   [v2/U9] compose project grouping + `docker compose` shell-out
+│   │   ├── context.go           #   [v2/U11] docker context enumeration + per-host client
+│   │   ├── maintenance.go       #   [v2/U12] image history + disk-usage + per-category prune
 │   │   └── util.go              #   JSON pretty-print helper
 │   └── ui/                      # the Bubble Tea application
 │       ├── app.go               #   root model, Update routing, layout, View composition
 │       ├── messages.go          #   tea.Msg types + commands (async daemon calls, stream readers)
 │       ├── keys.go              #   key bindings (bubbles/key)
 │       ├── styles.go            #   lipgloss styles derived from a theme
-│       ├── list.go              #   custom colorful table component (cursor, scroll, widths)
-│       ├── rows.go              #   per-resource-kind column/row builders + filter + formatting
-│       ├── update_list.go       #   list-view key handling + container/resource actions
+│       ├── list.go              #   custom colorful table component (cursor, scroll, widths, mark gutter)
+│       ├── rows.go              #   per-resource-kind column/row builders (incl. compose) + filter
+│       ├── update_list.go       #   list-view key handling + container/compose/bulk/resource actions
 │       ├── detail.go            #   logs + live-stats split view + inspect view
-│       ├── overlays.go          #   filter, command palette, confirm dialog, help, header, hint bar
+│       ├── overlays.go          #   filter, command palette, confirm, help, context/oplog/prune, header, hints
+│       ├── context.go           #   [v2/U11] host/context switcher overlay + runtime client swap
+│       ├── maintenance.go       #   [v2/U12] operation log + prune dashboard + image-layer view
 │       ├── exec.go              #   exec into a shell via tea.ExecProcess
 │       └── theme/
 │           └── theme.go         #   color palettes + state→color/glyph mapping
@@ -201,6 +206,11 @@ cover product/scope). Recorded here so the rationale survives.
 | CR-5 | Custom list renderer instead of `bubbles/table` | Per-cell color is essential to the colorful brief and unsupported by `bubbles/table` |
 | CR-6 | `exec` shells out to `docker exec -it` via `tea.ExecProcess` | Gives a correct interactive PTY for free; the docker CLI is virtually always present alongside the daemon (same approach as lazydocker) |
 | CR-7 | Periodic polling (`tea.Tick` 1.5s) for live list updates | Robust and simple vs. subscribing to the Docker event stream; revisit if event-driven refresh is wanted |
+| CR-8 | **[v2/U9]** Compose projects are *derived* from the live container list (`com.docker.compose.*` labels), not from parsing compose files | No extra state or file parsing; the project view is always consistent with what is actually running. `dockerx.ComposeProjects` is a pure function (unit-tested) |
+| CR-9 | **[v2/U9]** Compose lifecycle ops shell out to `docker compose` (inception DR-5), passing the project's `config_files`/`working_dir` labels through `-f`/`--project-directory` | The SDK has no compose API; delegating matches `docker compose` semantics incl. `depends_on` ordering for free. Parity with CR-6. Availability is probed once (`composeAvailCmd`); the view degrades read-only when absent (R9) |
+| CR-10 | **[v2/U11]** Contexts come from `docker context ls` (CLI), and switching rebuilds the `dockerx.Client` via `NewClientForHost` | Follows the Docker-standard context mechanism (DR-6) without re-implementing the on-disk format; client swap stays inside `dockerx` (NFR-M1). Streams are torn down and view state reset on switch (R11) |
+| CR-11 | **[v2/U12]** The operation log is recorded centrally in `Update` on every `actionDoneMsg` | All one-shot/bulk/compose/prune actions already funnel through `actionDoneMsg`, so a single hook captures them uniformly — no threading through call sites (FR-OL1). Session-only ring buffer (OQ-6) |
+| CR-12 | **[v2/U10]** Bulk actions fan out with one goroutine per target and aggregate the outcome (`bulkAction`); partial failure is tolerated | Matches the non-blocking command model; reports `N ok / M failed` rather than aborting on first error (FR-B5 / R10). The mark gutter is a width-reserving column on the custom list renderer (CR-5) |
 
 ---
 
@@ -216,3 +226,7 @@ cover product/scope). Recorded here so the rationale survives.
 | A command-palette verb | `overlays.go` (`runCommand`, `commandNames`) |
 | Layout / sizing | `recomputeLayout` in `app.go` |
 | The detail (logs+stats) view | `detail.go` |
+| Compose grouping / ops | `dockerx/compose.go` (+ `rows.go` `buildCompose`, `update_list.go` `updateComposeActions`) |
+| Bulk/multi-select behaviour | `update_list.go` (`updateBulkActions`, `toggleMarkAll`) + `list.go` (mark gutter) |
+| Context/host switching | `dockerx/context.go` + `ui/context.go` |
+| Op log / prune dashboard / layer view | `ui/maintenance.go` (+ `dockerx/maintenance.go`) |

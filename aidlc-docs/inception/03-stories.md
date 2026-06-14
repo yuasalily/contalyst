@@ -94,3 +94,57 @@
 - **Given** Docker が動くマシン **When** バイナリを実行 **Then** デフォルトソケットに接続し一覧が出る。
 - **Given** Docker に接続不可 **Then** 原因の分かるエラーを表示し異常終了しない。
 - 要件: FR-E1, FR-E3, NFR-M2
+
+---
+
+## v2 ストーリー（Post-MVP 昇格分 / M5–M8）
+
+> [00-inception.md](./00-inception.md) §5.2 でスコープへ昇格した 4 領域に対応。要件は [01-requirements.md](./01-requirements.md) 「v2 機能要件」、作業単位は U9〜U12。
+
+### US-15: compose プロジェクト単位で起動/停止/再ビルドする  *(M5)*
+**As a** 開発者/運用者, **I want** compose プロジェクトをまとめて up/down/restart/rebuild したい, **so that** 個々のコンテナを辿らず、サービス群を一括で扱える。
+- **Given** compose で起動したコンテナ群がある **When** `:compose` を開く **Then** プロジェクトがサービス数/稼働数/状態集約と共に一覧される。
+- **Given** プロジェクトを選択 **When** `up`/`down`/`restart`/`rebuild` を実行 **Then** `depends_on` の依存順を尊重して該当操作が走る。
+- **Given** `rebuild` **When** `--no-cache` を選ぶ **Then** キャッシュなしで再ビルドされる。
+- **Given** 破壊系の `down` **When** 実行キー **Then** 確認ダイアログを経由する（既定フォーカスは非破壊側）。
+- **Given** `docker compose` が無い環境 **Then** compose ビューは無効化され、原因が明示される（クラッシュしない）。
+- 要件: FR-CMP1, FR-CMP3, FR-CMP4, FR-CMP5, FR-CMP7, NFR-CMP1
+
+### US-16: compose プロジェクトをまとめて観測する  *(M5)*
+**As a** 開発者, **I want** プロジェクト配下のサービス一覧とログを横断で見たい, **so that** どのサービスが落ちたか/何を出しているかを 1 画面で把握できる。
+- **Given** プロジェクトを選択 **When** ドリルダウン **Then** そのサービス（コンテナ）一覧が表示される。
+- **Given** プロジェクトの集約ログ **Then** 全サービスのログが横断表示される。
+- 要件: FR-CMP2, FR-CMP6
+
+### US-17: 複数コンテナを選択して一括操作する  *(M6)*
+**As a** 多数コンテナを扱う運用者, **I want** 複数行をマークして一括で start/stop/restart/remove したい, **so that** 同じ操作を何度も繰り返さずに済む。
+- **Given** 一覧表示中 **When** `Space` で複数行をマーク **Then** マーク状態が視覚的に示される。
+- **Given** マーク済みの複数対象 **When** 一括操作キー **Then** 全対象へ並行適用され、対象ごとの成功/失敗が集約表示される。
+- **Given** バルク remove **When** 実行キー **Then** 対象件数を明示した 1 つの確認ダイアログが出る（既定フォーカスは非破壊側）。
+- 要件: FR-B1, FR-B2, FR-B3, FR-B4, FR-B5, NFR-B1
+
+### US-18: Docker ホスト/コンテキストを切り替える  *(M7)*
+**As a** 複数環境を扱う SRE, **I want** 起動したまま接続先 Docker ホストを切り替えたい, **so that** ローカル/ステージング/本番を 1 ツールで行き来できる。
+- **Given** 複数の Docker context がある **When** コンテキスト一覧を開く **Then** アクティブなコンテキストが分かる形で列挙される。
+- **Given** 別コンテキストを選択 **When** 切替 **Then** 接続先が再生成され、一覧が新ホストの内容に更新される。
+- **Given** 切替 **Then** 旧ホストのストリーム購読は teardown され、選択/フィルタ/履歴が reset される。
+- **Given** ヘッダ **Then** アクティブホスト/コンテキスト名が表示される。
+- **Given** 切替先へ接続不可 **Then** 原因を表示し異常終了しない。
+- 要件: FR-H1, FR-H2, FR-H3, FR-H4, FR-H5, NFR-H1
+
+### US-19: イメージのレイヤーを確認する  *(M8)*
+**As a** 開発者, **I want** イメージのレイヤー構成（history）を見たい, **so that** サイズの大きいレイヤーや想定外のコマンドを特定できる。
+- **Given** イメージを選択 **When** レイヤービューを開く **Then** 各レイヤーがサイズ/生成コマンドと共に表示される。
+- 要件: FR-L1
+
+### US-20: prune ダッシュボードで安全に掃除する  *(M8)*
+**As a** 運用者, **I want** 再利用可能な領域を種別ごとに把握して prune したい, **so that** ディスクを安全に空けられる。
+- **Given** prune ダッシュボードを開く **Then** images/containers/volumes/networks/build cache の再利用可能量が集計表示される。
+- **Given** 種別を選択 **When** prune 実行 **Then** 再利用可能量を明示した確認を経て削除される（既定フォーカスは安全側）。
+- 要件: FR-PR1, FR-PR2
+
+### US-21: 実行した操作の履歴を見返す  *(M8)*
+**As a** 運用者, **I want** これまで実行した操作の履歴を見たい, **so that** 何をしたか/どれが失敗したかを後から確認できる。
+- **Given** 操作（lifecycle/compose/prune 等）を実行 **Then** 時刻/対象/結果付きで操作ログに記録される。
+- **Given** 操作ログを開く **Then** 履歴が一覧され、失敗操作はエラー要約が見える。
+- 要件: FR-OL1, FR-OL2

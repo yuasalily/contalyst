@@ -37,6 +37,12 @@ type list struct {
 	offset int
 	width  int
 	height int // visible body rows (excludes the column header line)
+
+	// emptyMsg overrides the "(nothing here)" placeholder when set (e.g. the
+	// compose view explaining the plugin is missing). marked carries the bulk
+	// multi-select set (U10); a "✓" gutter is drawn when it is non-nil.
+	emptyMsg string
+	marked   map[string]bool
 }
 
 func (l *list) setRows(rows []listRow) {
@@ -104,7 +110,7 @@ func (l *list) resolveWidths() []int {
 		}
 	}
 	gaps := gap * (len(l.cols) - 1)
-	leftover := l.width - fixed - gaps
+	leftover := l.width - l.gutter() - fixed - gaps
 	if flex > 0 {
 		each := leftover / flex
 		for i, c := range l.cols {
@@ -122,18 +128,23 @@ func (l *list) resolveWidths() []int {
 
 func (l *list) view(s styles) string {
 	widths := l.resolveWidths()
+	gut := l.gutter()
 	var b strings.Builder
 
-	// Column header.
+	// Column header (with a blank mark gutter when marking is enabled).
 	var head []string
 	for i, c := range l.cols {
 		head = append(head, pad(c.title, widths[i]))
 	}
-	b.WriteString(s.colHeader.Render(strings.Join(head, "  ")))
+	b.WriteString(s.colHeader.Render(strings.Repeat(" ", gut) + strings.Join(head, "  ")))
 	b.WriteString("\n")
 
 	if len(l.rows) == 0 {
-		b.WriteString(s.empty.Render("  (nothing here)"))
+		msg := l.emptyMsg
+		if msg == "" {
+			msg = "(nothing here)"
+		}
+		b.WriteString(s.empty.Render("  " + msg))
 		return b.String()
 	}
 
@@ -141,6 +152,7 @@ func (l *list) view(s styles) string {
 	for ri := l.offset; ri < end; ri++ {
 		r := l.rows[ri]
 		selected := ri == l.cursor
+		marked := l.marked != nil && l.marked[r.id]
 		var cells []string
 		for ci := range l.cols {
 			var cl cell
@@ -162,9 +174,25 @@ func (l *list) view(s styles) string {
 			}
 			cells = append(cells, st.Render(txt))
 		}
+
+		gutter := ""
+		if gut > 0 {
+			mark := " "
+			if marked {
+				mark = "✓"
+			}
+			if selected {
+				gutter = mark + " "
+			} else {
+				gutter = s.markGutter.Render(mark) + " "
+			}
+		}
+
 		line := strings.Join(cells, "  ")
 		if selected {
-			line = s.rowSel.Width(l.width).Render(line)
+			line = s.rowSel.Width(l.width).Render(gutter + line)
+		} else {
+			line = gutter + line
 		}
 		b.WriteString(line)
 		if ri < end-1 {
@@ -172,6 +200,15 @@ func (l *list) view(s styles) string {
 		}
 	}
 	return b.String()
+}
+
+// gutter returns the width reserved for the bulk-mark indicator (0 when the
+// active list does not support marking).
+func (l *list) gutter() int {
+	if l.marked == nil {
+		return 0
+	}
+	return 2
 }
 
 // pad truncates (with an ellipsis) or right-pads s to exactly w display cells.

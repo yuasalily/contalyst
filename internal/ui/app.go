@@ -31,6 +31,9 @@ const (
 	ovConfirm
 	ovHelp
 	ovLogSearch
+	ovContext // U11: host/context switcher
+	ovOpLog   // U12: operation log
+	ovPrune   // U12: prune dashboard
 )
 
 type connectedMsg struct{ ver string }
@@ -56,6 +59,25 @@ type model struct {
 	images     []dockerx.Image
 	volumes    []dockerx.Volume
 	networks   []dockerx.Network
+
+	// Compose (U9): projects are derived from the container list.
+	composeProjects []dockerx.ComposeProject
+	composeAvail    bool
+	composeScope    string // when set, the container list is scoped to this project
+
+	// Bulk multi-select (U10): set of marked container ids.
+	marked map[string]bool
+
+	// Multi-host / context switching (U11).
+	contexts      []dockerx.DockerContext
+	contextName   string // active context name shown in the header
+	contextCursor int    // selection cursor in the context overlay
+
+	// Maintenance (U12): operation log + prune dashboard.
+	opLog       []opEntry
+	pruneUsage  []dockerx.Usage
+	pruneSel    []bool
+	pruneCursor int
 
 	filter      string
 	filterInput textinput.Model
@@ -103,6 +125,7 @@ func New(client *dockerx.Client) model {
 		cmdInput:    ci,
 		searchInput: si,
 		rounded:     true,
+		marked:      map[string]bool{},
 	}
 }
 
@@ -173,7 +196,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case connectedMsg:
 		m.ready = true
 		m.serverVer = msg.ver
-		return m, tea.Batch(m.loadCmd(), tickCmd())
+		return m, tea.Batch(m.loadCmd(), tickCmd(), composeAvailCmd())
+
+	case composeAvailMsg:
+		m.composeAvail = msg.ok
+		return m, nil
+
+	case contextsMsg:
+		m.contexts = []dockerx.DockerContext(msg)
+		m.contextCursor = 0
+		for i, c := range m.contexts {
+			if c.Current && m.contextName == "" {
+				m.contextName = c.Name
+			}
+			if c.Name == m.contextName {
+				m.contextCursor = i
+			}
+		}
+		m.overlay = ovContext
+		return m, nil
+
+	case reconnectedMsg:
+		if msg.err != nil {
+			return m, m.setToast("context switch failed: "+msg.err.Error(), true)
+		}
+		m.serverVer = msg.ver
+		return m, tea.Batch(m.setToast("switched to "+m.contextName, false), m.loadCmd(), composeAvailCmd())
 
 	case errMsg:
 		if !m.ready {
@@ -206,9 +254,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case actionDoneMsg:
+		// Every one-shot/bulk/compose/prune action funnels through here, so the
+		// operation log (U12 / FR-OL1) is recorded in one place.
 		if msg.err != nil {
+			m.recordOp(msg.err.Error(), false)
 			return m, m.setToast(msg.err.Error(), true)
 		}
+		m.recordOp(msg.ok, true)
 		return m, tea.Batch(m.setToast(msg.ok, false), m.loadCmd())
 
 	case execDoneMsg:
@@ -230,6 +282,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.inspect.title = msg.title
 		m.inspect.vp.SetContent(msg.text)
 		m.inspect.vp.GotoTop()
+		return m, nil
+
+	case layersMsg:
+		if msg.err != nil {
+			return m, m.setToast(msg.err.Error(), true)
+		}
+		m.state = stateInspect
+		m.inspect.title = "Layers: " + msg.title
+		m.inspect.vp.SetContent(msg.text)
+		m.inspect.vp.GotoTop()
+		return m, nil
+
+	case pruneUsageMsg:
+		if msg.err != nil {
+			return m, m.setToast(msg.err.Error(), true)
+		}
+		m.pruneUsage = msg.usage
+		m.pruneSel = make([]bool, len(msg.usage))
+		m.pruneCursor = 0
+		m.overlay = ovPrune
 		return m, nil
 
 	case logStartedMsg:
@@ -283,6 +355,15 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case ovLogSearch:
 		return m.updateLogSearch(msg)
+	case ovContext:
+		return m.updateContext(msg)
+	case ovPrune:
+		return m.updatePrune(msg)
+	case ovOpLog:
+		if key.Matches(msg, m.keys.Back, m.keys.OpLog, m.keys.Quit) {
+			m.overlay = ovNone
+		}
+		return m, nil
 	}
 
 	switch m.state {
