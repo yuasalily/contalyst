@@ -6,25 +6,19 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/build"
+
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
-// Layer is one entry in an image's history (U12 / FR-L1): a build step with the
-// disk space it added and the command that produced it.
-type Layer struct {
-	Size      int64
-	CreatedBy string
-	Created   time.Time
-}
-
 // ImageHistory returns an image's layers, newest first (as the daemon reports).
-func (c *Client) ImageHistory(ctx context.Context, id string) ([]Layer, error) {
+func (c *Client) ImageHistory(ctx context.Context, id string) ([]engine.Layer, error) {
 	hist, err := c.api.ImageHistory(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Layer, 0, len(hist))
+	out := make([]engine.Layer, 0, len(hist))
 	for _, h := range hist {
-		out = append(out, Layer{
+		out = append(out, engine.Layer{
 			Size:      h.Size,
 			CreatedBy: h.CreatedBy,
 			Created:   time.Unix(h.Created, 0),
@@ -33,43 +27,10 @@ func (c *Client) ImageHistory(ctx context.Context, id string) ([]Layer, error) {
 	return out, nil
 }
 
-// PruneKind identifies a category in the prune dashboard (U12 / FR-PR1).
-type PruneKind int
-
-const (
-	PruneKindImages PruneKind = iota
-	PruneKindContainers
-	PruneKindVolumes
-	PruneKindNetworks
-	PruneKindBuildCache
-)
-
-func (k PruneKind) Label() string {
-	switch k {
-	case PruneKindContainers:
-		return "stopped containers"
-	case PruneKindVolumes:
-		return "volumes"
-	case PruneKindNetworks:
-		return "networks"
-	case PruneKindBuildCache:
-		return "build cache"
-	default:
-		return "images"
-	}
-}
-
-// Usage is the reclaimable-space summary for one prune category.
-type Usage struct {
-	Kind        PruneKind
-	Count       int
-	Reclaimable int64
-}
-
 // DiskUsage summarises reclaimable space per category for the prune dashboard
 // (FR-PR1). Values are best-effort: where the daemon does not report a size
 // (e.g. RefCount/Containers == -1) the item is treated as in-use and excluded.
-func (c *Client) DiskUsage(ctx context.Context) ([]Usage, error) {
+func (c *Client) DiskUsage(ctx context.Context) ([]engine.Usage, error) {
 	du, err := c.api.DiskUsage(ctx, types.DiskUsageOptions{})
 	if err != nil {
 		return nil, err
@@ -87,7 +48,7 @@ func (c *Client) DiskUsage(ctx context.Context) ([]Usage, error) {
 	var ctN int
 	var ctSize int64
 	for _, ct := range du.Containers {
-		if !isUpState(string(ct.State)) {
+		if !engine.IsUpState(string(ct.State)) {
 			ctN++
 			ctSize += ct.SizeRw
 		}
@@ -115,12 +76,12 @@ func (c *Client) DiskUsage(ctx context.Context) ([]Usage, error) {
 
 	netN := c.removableNetworks(ctx)
 
-	return []Usage{
-		{Kind: PruneKindImages, Count: imgN, Reclaimable: imgSize},
-		{Kind: PruneKindContainers, Count: ctN, Reclaimable: ctSize},
-		{Kind: PruneKindVolumes, Count: volN, Reclaimable: volSize},
-		{Kind: PruneKindNetworks, Count: netN, Reclaimable: 0},
-		{Kind: PruneKindBuildCache, Count: bcN, Reclaimable: bcSize},
+	return []engine.Usage{
+		{Kind: engine.PruneKindImages, Count: imgN, Reclaimable: imgSize},
+		{Kind: engine.PruneKindContainers, Count: ctN, Reclaimable: ctSize},
+		{Kind: engine.PruneKindVolumes, Count: volN, Reclaimable: volSize},
+		{Kind: engine.PruneKindNetworks, Count: netN, Reclaimable: 0},
+		{Kind: engine.PruneKindBuildCache, Count: bcN, Reclaimable: bcSize},
 	}, nil
 }
 
@@ -143,15 +104,15 @@ func (c *Client) removableNetworks(ctx context.Context) int {
 }
 
 // Prune runs the prune for one dashboard category (FR-PR2).
-func (c *Client) Prune(ctx context.Context, k PruneKind) error {
+func (c *Client) Prune(ctx context.Context, k engine.PruneKind) error {
 	switch k {
-	case PruneKindContainers:
+	case engine.PruneKindContainers:
 		return c.PruneContainers(ctx)
-	case PruneKindVolumes:
+	case engine.PruneKindVolumes:
 		return c.PruneVolumes(ctx)
-	case PruneKindNetworks:
+	case engine.PruneKindNetworks:
 		return c.PruneNetworks(ctx)
-	case PruneKindBuildCache:
+	case engine.PruneKindBuildCache:
 		_, err := c.api.BuildCachePrune(ctx, build.CachePruneOptions{All: true})
 		return err
 	default:

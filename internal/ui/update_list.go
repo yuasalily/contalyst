@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -120,17 +120,17 @@ func (m model) updateComposeActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, k.Enter):
 		return m.enterComposeProject(p.Name)
 	case key.Matches(msg, k.ComposeUp):
-		return m, action("compose up "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, dockerx.ComposeUp) })
+		return m, action("compose up "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, engine.ComposeUp) })
 	case key.Matches(msg, k.Restart):
-		return m, action("compose restart "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, dockerx.ComposeRestart) })
+		return m, action("compose restart "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, engine.ComposeRestart) })
 	case key.Matches(msg, k.ComposeBuild):
-		return m, action("compose build "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, dockerx.ComposeBuild) })
+		return m, action("compose build "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, engine.ComposeBuild) })
 	case key.Matches(msg, k.ComposeBuildNC):
-		return m, action("compose build --no-cache "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, dockerx.ComposeBuildNoCache) })
+		return m, action("compose build --no-cache "+p.Name, func(ctx context.Context) error { return cl.Compose(ctx, p, engine.ComposeBuildNoCache) })
 	case key.Matches(msg, k.ComposeDown):
 		proj := p
 		m.openConfirm("Compose down", proj.Name+" (stop & remove)", true,
-			action("compose down "+proj.Name, func(ctx context.Context) error { return cl.Compose(ctx, proj, dockerx.ComposeDown) }))
+			action("compose down "+proj.Name, func(ctx context.Context) error { return cl.Compose(ctx, proj, engine.ComposeDown) }))
 		return m, nil
 	}
 	return m, nil
@@ -142,17 +142,17 @@ func (m model) enterComposeProject(name string) (tea.Model, tea.Cmd) {
 	return m, m.setKind(kindContainers)
 }
 
-func (m *model) currentComposeProject() (dockerx.ComposeProject, bool) {
+func (m *model) currentComposeProject() (engine.ComposeProject, bool) {
 	row, ok := m.lst.selected()
 	if !ok {
-		return dockerx.ComposeProject{}, false
+		return engine.ComposeProject{}, false
 	}
 	for _, p := range m.composeProjects {
 		if p.Name == row.id {
 			return p, true
 		}
 	}
-	return dockerx.ComposeProject{}, false
+	return engine.ComposeProject{}, false
 }
 
 func (m model) updateContainerActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -188,7 +188,7 @@ func (m model) updateContainerActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !isUp(c.State) {
 			return m, m.setToast("can't exec: container is not running", true)
 		}
-		return m, execContainer(c.ID)
+		return m, execContainer(cl.ExecSpec(c.ID))
 	case key.Matches(msg, k.Delete):
 		id, name := c.ID, c.Name
 		m.openConfirm("Remove container", name, true,
@@ -293,17 +293,17 @@ func (m model) updateResourceActions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // currentContainer returns the selected container by matching the list row id.
-func (m *model) currentContainer() (dockerx.Container, bool) {
+func (m *model) currentContainer() (engine.Container, bool) {
 	row, ok := m.lst.selected()
 	if !ok {
-		return dockerx.Container{}, false
+		return engine.Container{}, false
 	}
 	for _, c := range m.containers {
 		if c.ID == row.id {
 			return c, true
 		}
 	}
-	return dockerx.Container{}, false
+	return engine.Container{}, false
 }
 
 func isUp(state string) bool {

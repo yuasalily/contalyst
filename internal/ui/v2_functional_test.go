@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 func sampleComposeContainers() containersMsg {
@@ -134,10 +134,10 @@ func TestFunctional_ContextSwitcherOverlay(t *testing.T) {
 
 func TestFunctional_PruneDashboard(t *testing.T) {
 	m := ready(t)
-	m = feed(t, m, pruneUsageMsg{usage: []dockerx.Usage{
-		{Kind: dockerx.PruneKindImages, Count: 12, Reclaimable: 1900 << 20},
-		{Kind: dockerx.PruneKindBuildCache, Count: 5, Reclaimable: 940 << 20},
-		{Kind: dockerx.PruneKindVolumes, Count: 4, Reclaimable: 320 << 20},
+	m = feed(t, m, pruneUsageMsg{usage: []engine.Usage{
+		{Kind: engine.PruneKindImages, Count: 12, Reclaimable: 1900 << 20},
+		{Kind: engine.PruneKindBuildCache, Count: 5, Reclaimable: 940 << 20},
+		{Kind: engine.PruneKindVolumes, Count: 4, Reclaimable: 320 << 20},
 	}})
 	if m.overlay != ovPrune {
 		t.Fatalf("expected prune overlay, got %v", m.overlay)
@@ -184,7 +184,7 @@ func TestFunctional_OperationLog(t *testing.T) {
 
 func TestFunctional_ImageLayerView(t *testing.T) {
 	m := ready(t)
-	m = feed(t, m, layersMsg{title: "nginx:alpine", text: formatLayers([]dockerx.Layer{
+	m = feed(t, m, layersMsg{title: "nginx:alpine", text: formatLayers([]engine.Layer{
 		{Size: 78 << 20, CreatedBy: "/bin/sh -c apt-get install -y build-essential"},
 		{Size: 12 << 20, CreatedBy: "COPY . /app"},
 	})})

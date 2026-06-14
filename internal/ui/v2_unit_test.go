@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 func TestUnit_FormatLayers(t *testing.T) {
-	layers := []dockerx.Layer{
+	layers := []engine.Layer{
 		{Size: 78 << 20, CreatedBy: "/bin/sh -c #(nop)  CMD [\"nginx\"]"},
 		{Size: 0, CreatedBy: "/bin/sh -c apt-get update"},
 	}

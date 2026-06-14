@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/yuasalily/contalyst/internal/dockerx"
+	"github.com/yuasalily/contalyst/internal/engine"
 )
 
 // feed applies a sequence of messages to the model, discarding commands (which
@@ -57,8 +57,8 @@ func TestFunctional_DetailView(t *testing.T) {
 	nm, _ := m.enterDetail("id-web", "ct-web")
 	m = nm.(model)
 	m = feed(t, m,
-		logLineMsg(dockerx.LogLine{Text: "server started on :80"}),
-		statsMsg(dockerx.Stats{CPUPercent: 12.5, MemUsage: 256 << 20, MemLimit: 1 << 30, MemPercent: 25, Pids: 7}),
+		logLineMsg(engine.LogLine{Text: "server started on :80"}),
+		statsMsg(engine.Stats{CPUPercent: 12.5, MemUsage: 256 << 20, MemLimit: 1 << 30, MemPercent: 25, Pids: 7}),
 	)
 	out := m.View()
 	for _, want := range []string{"Logs", "Stats", "server started on :80", "CPU", "12.5%", "follow"} {
@@ -149,9 +149,9 @@ func TestFunctional_LogSearch(t *testing.T) {
 	nm, _ := m.enterDetail("id-web", "ct-web")
 	m = nm.(model)
 	m = feed(t, m,
-		logLineMsg(dockerx.LogLine{Text: "listening on :80"}),
-		logLineMsg(dockerx.LogLine{Text: "ERROR: connection refused"}),
-		logLineMsg(dockerx.LogLine{Text: "retrying error in 1s"}),
+		logLineMsg(engine.LogLine{Text: "listening on :80"}),
+		logLineMsg(engine.LogLine{Text: "ERROR: connection refused"}),
+		logLineMsg(engine.LogLine{Text: "retrying error in 1s"}),
 	)
 	// Open search and type a query that matches two lines (case-insensitive).
 	m = feed(t, m, keyRunes("/"))

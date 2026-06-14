@@ -7,20 +7,16 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
-)
 
-// LogLine is a single line emitted by a log stream, or a terminal error.
-type LogLine struct {
-	Text string
-	Err  error // non-nil signals the stream ended (io.EOF on clean close)
-}
+	"github.com/yuasalily/contalyst/internal/engine"
+)
 
 // LogStream follows a container's logs and returns a channel of lines. The
 // caller cancels ctx to stop streaming; the channel is closed when the stream
 // ends. Stdout/stderr are demultiplexed correctly based on the container's TTY
 // setting (inception R1): non-TTY streams carry an 8-byte frame header and must
 // go through stdcopy, TTY streams are raw.
-func (c *Client) LogStream(ctx context.Context, id string, timestamps bool) (<-chan LogLine, error) {
+func (c *Client) LogStream(ctx context.Context, id string, timestamps bool) (<-chan engine.LogLine, error) {
 	tty, err := c.HasTTY(ctx, id)
 	if err != nil {
 		return nil, err
@@ -37,7 +33,7 @@ func (c *Client) LogStream(ctx context.Context, id string, timestamps bool) (<-c
 		return nil, err
 	}
 
-	out := make(chan LogLine, 256)
+	out := make(chan engine.LogLine, 256)
 
 	// source is the demuxed, plain-text byte stream.
 	var source io.Reader = reader
@@ -64,12 +60,12 @@ func (c *Client) LogStream(ctx context.Context, id string, timestamps bool) (<-c
 			select {
 			case <-ctx.Done():
 				return
-			case out <- LogLine{Text: scanner.Text()}:
+			case out <- engine.LogLine{Text: scanner.Text()}:
 			}
 		}
 		if err := scanner.Err(); err != nil && ctx.Err() == nil {
 			select {
-			case out <- LogLine{Err: err}:
+			case out <- engine.LogLine{Err: err}:
 			case <-ctx.Done():
 			}
 		}
